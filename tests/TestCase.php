@@ -1,37 +1,94 @@
 <?php
 
-namespace VendorName\Skeleton\Tests;
+declare(strict_types=1);
 
-use Illuminate\Database\Eloquent\Factories\Factory;
+namespace Entrepeneur4lyf\LaravelConductor\Tests;
+
+use Atlasphp\Atlas\AtlasServiceProvider;
+use Entrepeneur4lyf\LaravelConductor\LaravelConductorServiceProvider;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
 use Orchestra\Testbench\TestCase as Orchestra;
-use VendorName\Skeleton\SkeletonServiceProvider;
+use Spatie\LaravelData\LaravelDataServiceProvider;
 
 class TestCase extends Orchestra
 {
+    protected function getPackageProviders($app): array
+    {
+        return [
+            AtlasServiceProvider::class,
+            LaravelConductorServiceProvider::class,
+            LaravelDataServiceProvider::class,
+        ];
+    }
+
+    protected function getEnvironmentSetUp($app): void
+    {
+        $app['config']->set('database.default', 'sqlite');
+        $app['config']->set('database.connections.sqlite', [
+            'driver' => 'sqlite',
+            'database' => ':memory:',
+            'prefix' => '',
+            'foreign_key_constraints' => true,
+        ]);
+    }
+
     protected function setUp(): void
     {
         parent::setUp();
 
-        Factory::guessFactoryNamesUsing(
-            fn (string $modelName) => 'VendorName\\Skeleton\\Database\\Factories\\'.class_basename($modelName).'Factory'
-        );
+        $this->prepareConductorDatabase();
     }
 
-    protected function getPackageProviders($app)
+    private function prepareConductorDatabase(): void
     {
-        return [
-            SkeletonServiceProvider::class,
-        ];
-    }
+        Schema::dropIfExists('step_runs');
+        Schema::dropIfExists('pipeline_runs');
 
-    public function getEnvironmentSetUp($app)
-    {
-        config()->set('database.default', 'testing');
+        Schema::create('pipeline_runs', function (Blueprint $table): void {
+            $table->ulid('id')->primary();
+            $table->string('workflow');
+            $table->unsignedInteger('workflow_version');
+            $table->unsignedInteger('revision')->default(1);
+            $table->string('status');
+            $table->string('current_step_id')->nullable();
+            $table->json('input');
+            $table->json('snapshot');
+            $table->json('wait')->nullable();
+            $table->json('output')->nullable();
+            $table->json('context')->nullable();
+            $table->json('timeline')->nullable();
+            $table->timestamps();
 
-        /*
-         foreach (\Illuminate\Support\Facades\File::allFiles(__DIR__ . '/../database/migrations') as $migration) {
-            (include $migration->getRealPath())->up();
-         }
-         */
+            $table->index('workflow');
+            $table->index('status');
+            $table->index(['workflow', 'status']);
+        });
+
+        Schema::create('step_runs', function (Blueprint $table): void {
+            $table->ulid('id')->primary();
+            $table->ulid('pipeline_run_id');
+            $table->string('step_definition_id');
+            $table->string('status');
+            $table->unsignedInteger('attempt')->default(1);
+            $table->integer('batch_index')->nullable();
+            $table->json('input')->nullable();
+            $table->json('output')->nullable();
+            $table->text('error')->nullable();
+            $table->text('prompt_override')->nullable();
+            $table->json('supervisor_decision')->nullable();
+            $table->text('supervisor_feedback')->nullable();
+            $table->timestamps();
+
+            $table->foreign('pipeline_run_id')
+                ->references('id')
+                ->on('pipeline_runs')
+                ->cascadeOnDelete();
+
+            $table->index('pipeline_run_id');
+            $table->index(['pipeline_run_id', 'step_definition_id']);
+            $table->index('status');
+            $table->unique(['pipeline_run_id', 'step_definition_id', 'attempt', 'batch_index'], 'step_runs_identity_unique');
+        });
     }
 }

@@ -1,0 +1,26 @@
+name: content-pipeline-e2e
+version: 1
+description: End-to-end workflow fixture
+defaults:
+  timeout: 120
+steps:
+  - id: research
+    agent: research-agent
+    prompt_template: prompts/research.md.j2
+    output_schema: '@schemas/research-output.json'
+    retries: 2
+    on_success: approval
+
+  - id: approval
+    agent: approval-agent
+    prompt_template: prompts/approval.md.j2
+    output_schema: '@schemas/approval-output.json'
+    wait_for: approval
+    retries: 0
+    on_success: complete
+
+failure_handlers:
+  - match: schema_validation_failed
+    action: retry
+    delay: 30
+    prompt_template: prompts/research.md.j2

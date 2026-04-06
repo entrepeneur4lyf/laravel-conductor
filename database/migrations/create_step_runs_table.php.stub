@@ -1,0 +1,44 @@
+<?php
+
+declare(strict_types=1);
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('step_runs', function (Blueprint $table): void {
+            $table->ulid('id')->primary();
+            $table->ulid('pipeline_run_id');
+            $table->string('step_definition_id');
+            $table->string('status');
+            $table->unsignedInteger('attempt')->default(1);
+            $table->integer('batch_index')->nullable();
+            $table->json('input')->nullable();
+            $table->json('output')->nullable();
+            $table->text('error')->nullable();
+            $table->text('prompt_override')->nullable();
+            $table->json('supervisor_decision')->nullable();
+            $table->text('supervisor_feedback')->nullable();
+            $table->timestamps();
+
+            $table->foreign('pipeline_run_id')
+                ->references('id')
+                ->on('pipeline_runs')
+                ->cascadeOnDelete();
+
+            $table->index('pipeline_run_id');
+            $table->index(['pipeline_run_id', 'step_definition_id']);
+            $table->index('status');
+            $table->unique(['pipeline_run_id', 'step_definition_id', 'attempt', 'batch_index'], 'step_runs_identity_unique');
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('step_runs');
+    }
+};

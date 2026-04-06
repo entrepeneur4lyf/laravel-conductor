@@ -1,0 +1,16 @@
+{
+  "type": "object",
+  "required": [
+    "result"
+  ],
+  "properties": {
+    "result": {
+      "type": "string"
+    },
+    "context_map": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}

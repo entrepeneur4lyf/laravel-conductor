@@ -1,0 +1,13 @@
+name: duplicate-step-ids
+version: 1
+steps:
+  - id: review
+    agent: review-agent
+    prompt_template: prompts/research.md.j2
+    output_schema: '@schemas/research-output.json'
+    on_success: complete
+  - id: review
+    agent: approval-agent
+    prompt_template: prompts/research.md.j2
+    output_schema: '@schemas/research-output.json'
+    on_success: complete

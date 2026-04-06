@@ -1,0 +1,17 @@
+name: content-pipeline
+version: 1
+description: Content pipeline
+defaults:
+  timeout: 120
+steps:
+  - id: research
+    agent: research-agent
+    prompt_template: prompts/research.md.j2
+    output_schema: '@schemas/research-output.json'
+    retries: 2
+    on_success: complete
+failure_handlers:
+  - match: schema_validation_failed
+    action: retry
+    delay: 30
+    prompt_template: prompts/research.md.j2

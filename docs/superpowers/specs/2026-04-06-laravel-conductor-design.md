@@ -3,9 +3,13 @@
 # Laravel Conductor Design Spec
 
 Date: 2026-04-06
-Status: Draft for review
+Status: Revised draft for review
 Package: `entrepeneur4lyf/laravel-conductor`
 Target runtime: Laravel `^13.0`, PHP `^8.3`
+
+This design spec is governed by the companion runtime semantics spec at
+`docs/superpowers/specs/2026-04-06-laravel-conductor-runtime-semantics.md`.
+If there is any conflict between the two, the runtime semantics spec wins.
 
 ## 1. Summary
 
@@ -21,7 +25,11 @@ Conductor does not depend on a long-running in-memory process. A workflow advanc
 4. the result is evaluated and a disposition is assigned
 5. an endpoint or callback re-enters the supervisor for the next transition
 
-Canonical workflow state is persisted as structured JSON. Atlas persistence and events provide execution telemetry and integration hooks, but the Conductor task-state file is the authoritative workflow dossier.
+Canonical workflow state is persisted as a revisioned workflow dossier. The
+default V2 implementation stores that dossier in the database with optimistic
+concurrency. File-backed state is a portability fallback, not the default.
+Atlas persistence and events provide execution telemetry and integration hooks,
+but the Conductor dossier is the authoritative workflow state.
 
 ## 2. Goals
 
@@ -58,10 +66,14 @@ Definitions are consumed and compiled into typed internal data objects. The auth
 
 ### 4.2 Task-State File
 
-Each workflow run has a canonical JSON state file. This file contains only relevant workflow context:
+Each workflow run has a canonical workflow dossier. In V2, the default
+implementation stores it in the database as structured JSON with a monotonic
+`revision` field. This dossier contains only relevant workflow context:
 
 - workflow metadata
 - normalized input payload
+- compiled workflow snapshot
+- revision
 - current status and current step
 - prior step outputs
 - decisions and dispositions
@@ -69,7 +81,7 @@ Each workflow run has a canonical JSON state file. This file contains only relev
 - timeline entries
 - next-action metadata
 
-The task-state file is a curated workflow dossier, not a full chat transcript.
+The dossier is a curated workflow state document, not a full chat transcript.
 
 ### 4.3 Supervisor
 
@@ -98,6 +110,27 @@ Each step invokes an Atlas agent with:
 
 Each step agent has its own narrower workflow. It does not own the end-to-end orchestration graph.
 
+### 4.5 Run and Step State Machines
+
+Observable run states:
+
+- `pending`
+- `initializing`
+- `running`
+- `waiting`
+- `completed`
+- `failed`
+- `cancelled`
+
+Observable step states:
+
+- `pending`
+- `running`
+- `completed`
+- `failed`
+- `skipped`
+- `retrying`
+
 ## 5. Package Dependencies
 
 ### Required
@@ -110,7 +143,7 @@ Each step agent has its own narrower workflow. It does not own the end-to-end or
 ### Optional / Deferred
 
 - Atlas persistence enabled in the host application
-- Redis for future hot-state acceleration
+- Redis or advisory locks through a pluggable `RunLockProvider`
 - UI example applications
 
 ## 6. Definition Contract
@@ -132,7 +165,7 @@ Example workflow fields include:
 Each step may define:
 
 - `id`
-- `worker` or Atlas-resolved step target
+- `agent`
 - `prompt_template`
 - `output_schema`
 - `retries`
@@ -140,8 +173,10 @@ Each step may define:
 - `parallel`
 - `foreach`
 - `condition`
+- `wait_for`
 - `on_success`
 - `on_fail`
+- `context_map`
 - `quality_rules`
 
 Failure handlers may define:
@@ -160,8 +195,7 @@ Expected DTO families:
 - `WorkflowDefinitionData`
 - `StepDefinitionData`
 - `FailureHandlerData`
-- `PromptTemplateReferenceData`
-- `SchemaReferenceData`
+- `CompiledWorkflowData`
 - `WorkflowRunStateData`
 - `StepExecutionStateData`
 - `SupervisorDecisionData`
@@ -182,15 +216,15 @@ The canonical lifecycle is:
 1. Trigger
    HTTP endpoint or tool call starts a workflow.
 2. Initialize
-   Conductor validates the definition, creates task-state JSON, and records the initial timeline entry.
+   Conductor validates the definition, compiles a frozen workflow snapshot, creates the initial dossier with `revision = 1`, and records the initial timeline entry.
 3. Supervise
    Supervisor resolves the next step and builds the Atlas request.
 4. Execute
    Atlas executes the step agent with structured request and response contracts.
 5. Evaluate
-   Conductor evaluates the step result using deterministic rules first.
+   Conductor evaluates the step result in exact deterministic order before any intelligent escalation.
 6. Disposition
-   Conductor assigns one of: `advance`, `retry`, `retry_with_prompt`, `skip`, `escalate`, `fail`, `complete`.
+   Conductor assigns one of: `advance`, `retry`, `retry_with_prompt`, `skip`, `wait`, `escalate`, `fail`, `complete`, `cancel`.
 7. Continue
    A callback or endpoint re-enters the supervisor to trigger the next step programmatically.
 
@@ -198,30 +232,34 @@ The canonical lifecycle is:
 
 Conductor must not rely on one long-running PHP process to hold orchestration state. Every transition must be safe across process restarts.
 
+Two foundational rules govern every transition:
+
+- state must be persisted before dispatch
+- every successful state write must increment `revision` by exactly 1
+
 ### 8.3 Continuation Mechanism
 
-Continuation is API-driven. The endpoint receives the disposition payload, rehydrates workflow state, determines the next action, persists updates, and dispatches the next step.
+Continuation is API-driven. The endpoint receives the disposition payload, rehydrates workflow state, determines the next action, persists updates using optimistic concurrency, and dispatches the next step only after the dossier write succeeds.
 
 Queues may still be used as an execution detail, but correctness must not depend on a resident queue worker holding state in memory.
 
 ## 9. Evaluation Model
 
-Supervisor evaluation is hybrid:
+Supervisor evaluation is hybrid and ordered:
 
 ### Deterministic first
 
-- definition validation
-- step existence checks
+- guard checks for terminal or stale runs
+- condition and skip checks
 - schema validation
-- timeout handling
-- retry counts
+- quality rules
+- failure handler matching
+- retry budget checks
 - transition resolution
-- condition checks
-- quality rule evaluation when expressible deterministically
 
 ### Intelligent when needed
 
-When deterministic evaluation cannot confidently assign disposition, Conductor may invoke a supervisor-grade Atlas agent to make a structured judgment.
+When deterministic evaluation cannot confidently assign disposition and no deterministic handler path exists, Conductor may invoke a supervisor-grade Atlas agent to make a structured judgment.
 
 This AI-powered evaluation must still emit a typed disposition payload and write the result into the task-state file.
 
@@ -229,7 +267,9 @@ This AI-powered evaluation must still emit a typed disposition payload and write
 
 ### Canonical
 
-- JSON task-state file per workflow run
+- revisioned workflow dossier per run
+- database-backed dossier storage by default in V2
+- compiled workflow snapshot frozen at initialization
 
 ### Supporting
 
@@ -238,8 +278,9 @@ This AI-powered evaluation must still emit a typed disposition payload and write
 
 ### Future extension
 
-- pluggable state store contract
-- optional Redis acceleration or caching layer
+- pluggable workflow state store contract
+- optional file-backed store for local portability
+- Redis locks or other lock providers through `RunLockProvider`
 - alternative storage backends if needed
 
 Atlas persistence is valuable for execution telemetry, token usage, tool calls, and debugging. It is not the authoritative Conductor workflow state.
@@ -261,12 +302,16 @@ Conductor should leverage:
 
 Conductor should model each step as an Atlas agent invocation with a step-scoped prompt and schema, not as an unrelated worker runtime.
 
+The default step executor should use Atlas structured output via
+`withSchema(...)->asStructured()` whenever an output schema is present.
+
 ## 12. Validation Responsibilities
 
 Before execution:
 
 - parse YAML or JSON
 - normalize the definition
+- compile a frozen workflow snapshot
 - validate required fields
 - validate step uniqueness
 - validate transition targets
@@ -280,6 +325,7 @@ During execution:
 - validate structured output against the declared schema
 - validate deterministic quality rules
 - validate disposition shape before continuation
+- reject stale writes using revision checks
 
 ## 13. Public Surface for V1
 
@@ -297,6 +343,7 @@ V1 should include HTTP endpoints for:
 
 - start workflow
 - continue workflow
+- resume waiting workflow
 - receive step disposition callback
 - get workflow status
 - retry workflow or step
@@ -356,10 +403,12 @@ V1 should include:
 - Atlas dependency integration
 - YAML/JSON workflow loader and validator
 - typed `Laravel Data` runtime model
-- canonical JSON task-state file
+- revisioned dossier storage with DB optimistic concurrency
+- compiled workflow snapshot
 - stateless supervisor runtime
 - structured Atlas step execution
 - deterministic and intelligent disposition handling
+- wait/resume semantics
 - REST lifecycle endpoints
 - event emission
 - sample workflow artifacts
@@ -373,7 +422,7 @@ Deferred until the backend contract is stable:
 - opinionated admin dashboard
 - React, Livewire, or Filament example apps
 - visual workflow editor integration
-- additional state stores beyond the canonical JSON file model
+- additional state stores beyond the default DB dossier model
 
 ## 17. Acceptance Criteria
 
@@ -381,9 +430,12 @@ The first implementation should be considered successful when:
 
 - a workflow can be authored fully in YAML or JSON without PHP step-definition code
 - Conductor validates the workflow before execution
-- a workflow run creates a canonical JSON state file
+- a workflow run creates a revisioned canonical dossier
+- every state mutation uses optimistic concurrency and increments revision exactly once
+- compiled workflow snapshots isolate in-flight runs from later YAML edits
 - each step executes through Atlas with structured output validation
 - the supervisor can assign disposition after each step
+- wait and resume flows are first-class and testable
 - continuation works through explicit process boundaries
 - retries and handler prompt overrides work
 - workflow state is resumable after process restart

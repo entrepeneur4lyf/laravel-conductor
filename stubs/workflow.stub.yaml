@@ -1,0 +1,21 @@
+name: {{ workflow_name }}
+version: 1
+description: {{ workflow_description }}
+defaults:
+  timeout: 120
+steps:
+  - id: research
+    agent: {{ agent_name }}
+    prompt_template: '{{ prompt_template }}'
+    output_schema: '{{ output_schema }}'
+    context_map:
+      topic: input.topic
+    wait_for: {{ wait_for }}
+    retries: 2
+    timeout: 120
+    on_success: complete
+failure_handlers:
+  - match: schema_validation_failed
+    action: retry
+    delay: 30
+    prompt_template: prompts/research.md.j2
