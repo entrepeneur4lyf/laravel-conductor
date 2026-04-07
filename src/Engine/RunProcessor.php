@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Entrepeneur4lyf\LaravelConductor\Engine;
 
+use Entrepeneur4lyf\LaravelConductor\Contracts\RunLockProvider;
 use Entrepeneur4lyf\LaravelConductor\Contracts\WorkflowStateStore;
 use Entrepeneur4lyf\LaravelConductor\Contracts\WorkflowStepExecutor;
 use Entrepeneur4lyf\LaravelConductor\Data\CompiledWorkflowData;
@@ -12,7 +13,10 @@ use Entrepeneur4lyf\LaravelConductor\Data\StepExecutionStateData;
 use Entrepeneur4lyf\LaravelConductor\Data\StepInputData;
 use Entrepeneur4lyf\LaravelConductor\Data\StepOutputData;
 use Entrepeneur4lyf\LaravelConductor\Data\SupervisorDecisionData;
+use Entrepeneur4lyf\LaravelConductor\Data\WorkflowRunResultData;
 use Entrepeneur4lyf\LaravelConductor\Data\WorkflowRunStateData;
+use Entrepeneur4lyf\LaravelConductor\Exceptions\RunNotFoundException;
+use Entrepeneur4lyf\LaravelConductor\Exceptions\RunRevisionMismatchException;
 use Entrepeneur4lyf\LaravelConductor\Support\Timeline;
 use RuntimeException;
 use Throwable;
@@ -24,69 +28,119 @@ final class RunProcessor
         private readonly WorkflowStepExecutor $executor,
         private readonly Supervisor $supervisor,
         private readonly TemplateRenderer $templateRenderer,
+        private readonly RunLockProvider $lockProvider,
     ) {}
 
-    public function continueRun(string $runId): SupervisorDecisionData
+    public function continueRun(string $runId): WorkflowRunResultData
     {
-        $run = $this->stateStore->get($runId);
+        return $this->lockProvider->withLock($runId, function () use ($runId): WorkflowRunResultData {
+            $run = $this->stateStore->get($runId);
 
+            if ($run === null) {
+                throw new RunNotFoundException($runId);
+            }
+
+            if ($this->isTerminal($run)) {
+                return $this->buildResult(
+                    $run,
+                    new SupervisorDecisionData(
+                        action: 'noop',
+                        reason: 'Run is terminal.',
+                    ),
+                );
+            }
+
+            if ($run->current_step_id === null) {
+                return $this->buildResult(
+                    $run,
+                    new SupervisorDecisionData(
+                        action: 'noop',
+                        reason: 'Run has no current step.',
+                    ),
+                );
+            }
+
+            $decision = $this->supervisor->evaluate($run->id, $run->current_step_id);
+
+            if ($decision->action !== 'noop') {
+                return $this->buildResult($this->stateStore->get($runId) ?? $run, $decision);
+            }
+
+            $refreshed = $this->stateStore->get($runId);
+
+            if ($refreshed === null || $this->isTerminal($refreshed) || $refreshed->current_step_id === null) {
+                return $this->buildResult(
+                    $refreshed ?? $run,
+                    new SupervisorDecisionData(
+                        action: 'noop',
+                        reason: 'Run is not executable.',
+                    ),
+                );
+            }
+
+            $run = $refreshed;
+
+            $stepDefinition = $this->stepDefinition($run->snapshot, $run->current_step_id);
+            $step = $this->latestStep($run, $run->current_step_id);
+
+            if ($stepDefinition === null || $step === null) {
+                throw new RuntimeException(sprintf(
+                    'Current step [%s] could not be resolved for run [%s].',
+                    $run->current_step_id,
+                    $run->id,
+                ));
+            }
+
+            $input = $this->buildStepInput($run, $step, $stepDefinition);
+            $running = $this->persistRunning($run, $stepDefinition->id, $input);
+
+            // Layer 2 of the run-level concurrency defense: re-read the run
+            // immediately before the (expensive) executor call and confirm
+            // the locally held revision still matches what is persisted. If
+            // a concurrent request slipped through after the cache lock TTL
+            // expired and advanced the run, bail with a typed exception
+            // before any LLM tokens are burned. The final write layer
+            // (OptimisticRunMutator) is the authoritative correctness gate;
+            // this check just makes the wasted-work window as small as we
+            // can without async I/O.
+            $currentState = $this->stateStore->get($running->id);
+            if ($currentState === null) {
+                throw new RunNotFoundException($running->id);
+            }
+            if ($currentState->revision !== $running->revision) {
+                throw new RunRevisionMismatchException(
+                    $running->id,
+                    $running->revision,
+                    $currentState->revision,
+                );
+            }
+
+            try {
+                $output = $this->executor->execute($stepDefinition->agent, $input);
+                $completed = $this->persistCompleted($running, $stepDefinition->id, $input, $output);
+            } catch (Throwable $exception) {
+                $failed = $this->persistFailed($running, $stepDefinition->id, $input, $exception->getMessage());
+                $failureDecision = $this->supervisor->evaluate($failed->id, $stepDefinition->id);
+
+                return $this->buildResult($this->stateStore->get($runId) ?? $failed, $failureDecision);
+            }
+
+            $finalDecision = $this->supervisor->evaluate($completed->id, $stepDefinition->id);
+
+            return $this->buildResult($this->stateStore->get($runId) ?? $completed, $finalDecision);
+        });
+    }
+
+    private function buildResult(?WorkflowRunStateData $run, SupervisorDecisionData $decision): WorkflowRunResultData
+    {
         if ($run === null) {
-            throw new RuntimeException(sprintf('Workflow run [%s] was not found.', $runId));
+            throw new RuntimeException('Workflow run state could not be resolved while building the result.');
         }
 
-        if ($this->isTerminal($run)) {
-            return new SupervisorDecisionData(
-                action: 'noop',
-                reason: 'Run is terminal.',
-            );
-        }
-
-        if ($run->current_step_id === null) {
-            return new SupervisorDecisionData(
-                action: 'noop',
-                reason: 'Run has no current step.',
-            );
-        }
-
-        $decision = $this->supervisor->evaluate($run->id, $run->current_step_id);
-
-        if ($decision->action !== 'noop') {
-            return $decision;
-        }
-
-        $run = $this->stateStore->get($runId);
-
-        if ($run === null || $this->isTerminal($run) || $run->current_step_id === null) {
-            return new SupervisorDecisionData(
-                action: 'noop',
-                reason: 'Run is not executable.',
-            );
-        }
-
-        $stepDefinition = $this->stepDefinition($run->snapshot, $run->current_step_id);
-        $step = $this->latestStep($run, $run->current_step_id);
-
-        if ($stepDefinition === null || $step === null) {
-            throw new RuntimeException(sprintf(
-                'Current step [%s] could not be resolved for run [%s].',
-                $run->current_step_id,
-                $run->id,
-            ));
-        }
-
-        $input = $this->buildStepInput($run, $step, $stepDefinition);
-        $running = $this->persistRunning($run, $stepDefinition->id, $input);
-
-        try {
-            $output = $this->executor->execute($stepDefinition->agent, $input);
-            $completed = $this->persistCompleted($running, $stepDefinition->id, $input, $output);
-        } catch (Throwable $exception) {
-            $failed = $this->persistFailed($running, $stepDefinition->id, $input, $exception->getMessage());
-
-            return $this->supervisor->evaluate($failed->id, $stepDefinition->id);
-        }
-
-        return $this->supervisor->evaluate($completed->id, $stepDefinition->id);
+        return new WorkflowRunResultData(
+            run: $run,
+            decision: $decision,
+        );
     }
 
     private function buildStepInput(

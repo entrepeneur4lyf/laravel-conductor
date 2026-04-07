@@ -4,10 +4,14 @@ declare(strict_types=1);
 
 namespace Entrepeneur4lyf\LaravelConductor\Commands;
 
+use Entrepeneur4lyf\LaravelConductor\Conductor;
 use Entrepeneur4lyf\LaravelConductor\Contracts\WorkflowStateStore;
-use Entrepeneur4lyf\LaravelConductor\Data\WorkflowRunStateData;
-use Entrepeneur4lyf\LaravelConductor\Events\WorkflowCancelled;
+use Entrepeneur4lyf\LaravelConductor\Exceptions\RunLockedException;
+use Entrepeneur4lyf\LaravelConductor\Exceptions\RunNotCancellableException;
+use Entrepeneur4lyf\LaravelConductor\Exceptions\RunNotFoundException;
+use Entrepeneur4lyf\LaravelConductor\Exceptions\RunRevisionMismatchException;
 use Illuminate\Console\Command;
+use Throwable;
 
 final class CancelWorkflowCommand extends Command
 {
@@ -15,52 +19,58 @@ final class CancelWorkflowCommand extends Command
 
     protected $description = 'Cancel an active workflow run.';
 
-    public function handle(WorkflowStateStore $stateStore): int
+    public function handle(Conductor $conductor, WorkflowStateStore $stateStore): int
     {
-        $run = $stateStore->get((string) $this->argument('runId'));
+        $runId = (string) $this->argument('runId');
 
-        if ($run === null) {
+        try {
+            $updatedRun = $conductor->cancelRun(
+                $runId,
+                $this->expectedRevision($runId, $stateStore),
+            );
+        } catch (RunNotFoundException) {
             $this->error('Workflow run not found.');
 
             return self::FAILURE;
-        }
-
-        if (in_array($run->status, ['completed', 'failed', 'cancelled'], true)) {
+        } catch (RunNotCancellableException) {
             $this->error('Workflow run is not eligible for cancellation.');
 
             return self::FAILURE;
-        }
+        } catch (RunRevisionMismatchException $exception) {
+            $this->error(sprintf(
+                'Run revision mismatch: expected %d, got %d.',
+                $exception->expected,
+                $exception->actual,
+            ));
 
-        try {
-            $updatedRun = $stateStore->save(
-                WorkflowRunStateData::from([
-                    ...$run->toArray(),
-                    'revision' => $run->revision + 1,
-                    'status' => 'cancelled',
-                    'current_step_id' => null,
-                    'wait' => null,
-                ]),
-                $this->expectedRevision($run->revision),
-            );
-        } catch (\Throwable $exception) {
+            return self::FAILURE;
+        } catch (RunLockedException) {
+            $this->error('Workflow run is currently locked by another in-flight request. Try again in a moment.');
+
+            return self::FAILURE;
+        } catch (Throwable $exception) {
             $this->error($exception->getMessage());
 
             return self::FAILURE;
         }
-
-        event(new WorkflowCancelled($updatedRun, 'Manual cancellation requested.'));
 
         $this->info(sprintf('Cancelled workflow run [%s].', $updatedRun->id));
 
         return self::SUCCESS;
     }
 
-    private function expectedRevision(int $currentRevision): int
+    private function expectedRevision(string $runId, WorkflowStateStore $stateStore): int
     {
         $revision = $this->option('revision');
 
         if ($revision === null || $revision === '') {
-            return $currentRevision;
+            $run = $stateStore->get($runId);
+
+            if ($run === null) {
+                return 0;
+            }
+
+            return $run->revision;
         }
 
         return (int) $revision;

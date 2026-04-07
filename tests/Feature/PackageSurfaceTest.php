@@ -2,14 +2,18 @@
 
 declare(strict_types=1);
 
-use Entrepeneur4lyf\LaravelConductor\Conductor;
-use Entrepeneur4lyf\LaravelConductor\Contracts\RunLockProvider;
-use Entrepeneur4lyf\LaravelConductor\Contracts\WorkflowStateStore;
 use Entrepeneur4lyf\LaravelConductor\Data\CompiledWorkflowData;
 use Entrepeneur4lyf\LaravelConductor\Data\FailureHandlerData;
 use Entrepeneur4lyf\LaravelConductor\Data\StepDefinitionData;
 use Entrepeneur4lyf\LaravelConductor\Data\StepExecutionStateData;
+use Entrepeneur4lyf\LaravelConductor\Data\SupervisorDecisionData;
+use Entrepeneur4lyf\LaravelConductor\Data\WorkflowRunResultData;
 use Entrepeneur4lyf\LaravelConductor\Data\WorkflowRunStateData;
+use Entrepeneur4lyf\LaravelConductor\Facades\Conductor as ConductorFacade;
+use Entrepeneur4lyf\LaravelConductor\Contracts\RunLockProvider;
+use Entrepeneur4lyf\LaravelConductor\Conductor;
+use Entrepeneur4lyf\LaravelConductor\Support\CacheLockRunLockProvider;
+use Entrepeneur4lyf\LaravelConductor\Support\NullRunLockProvider;
 use Entrepeneur4lyf\LaravelConductor\Engine\Supervisor;
 use Entrepeneur4lyf\LaravelConductor\Engine\WorkflowEngine;
 use Entrepeneur4lyf\LaravelConductor\Events\RunWaiting;
@@ -18,7 +22,6 @@ use Entrepeneur4lyf\LaravelConductor\Events\WorkflowCancelled;
 use Entrepeneur4lyf\LaravelConductor\Events\WorkflowCompleted;
 use Entrepeneur4lyf\LaravelConductor\Events\WorkflowFailed;
 use Entrepeneur4lyf\LaravelConductor\Events\WorkflowStarted;
-use Entrepeneur4lyf\LaravelConductor\Facades\Conductor as ConductorFacade;
 use Illuminate\Support\Facades\Event;
 
 it('registers the conductor artisan commands', function (): void {
@@ -202,7 +205,20 @@ it('dispatches lifecycle events for modeled workflow transitions', function (): 
 
 it('binds the conductor service surface and run lock provider', function (): void {
     expect(app(Conductor::class))->toBeInstanceOf(Conductor::class)
-        ->and(app(RunLockProvider::class))->not->toBeNull();
+        ->and(app(RunLockProvider::class))->toBeInstanceOf(NullRunLockProvider::class);
+});
+
+it('falls back to CacheLockRunLockProvider when the test override is removed', function (): void {
+    // tests/TestCase.php binds NullRunLockProvider as a deterministic test
+    // default. Pop that override so the package's production binding is the
+    // one being resolved.
+    $this->app->forgetInstance(RunLockProvider::class);
+    $this->app->bind(
+        RunLockProvider::class,
+        \Entrepeneur4lyf\LaravelConductor\Support\CacheLockRunLockProvider::class,
+    );
+
+    expect(app(RunLockProvider::class))->toBeInstanceOf(CacheLockRunLockProvider::class);
 });
 
 it('allows the facade to start and fetch a workflow run', function (): void {
@@ -217,6 +233,36 @@ it('allows the facade to start and fetch a workflow run', function (): void {
     expect($started->id)->not->toBeEmpty()
         ->and($started->workflow)->toBe('content-pipeline-e2e')
         ->and($fetched?->id)->toBe($started->id);
+});
+
+it('returns WorkflowRunResultData from Conductor::continueRun so the decision is consistent with the state read inside the lock', function (): void {
+    // Seed a terminal run so continueRun short-circuits to a noop without
+    // needing to bind an executor — this exercises the new return contract
+    // specifically: decision + run, assembled inside the lock.
+    $run = storeLifecycleRun(
+        workflow: makeLifecycleWorkflow(),
+        steps: [
+            StepExecutionStateData::from([
+                'step_definition_id' => 'draft',
+                'status' => 'completed',
+                'attempt' => 1,
+            ]),
+        ],
+        overrides: [
+            'id' => 'run-continue-return-shape',
+            'status' => 'completed',
+            'current_step_id' => null,
+        ],
+    );
+
+    $result = app(Conductor::class)->continueRun($run->id);
+
+    expect($result)->toBeInstanceOf(WorkflowRunResultData::class)
+        ->and($result->run)->toBeInstanceOf(WorkflowRunStateData::class)
+        ->and($result->run->id)->toBe($run->id)
+        ->and($result->run->status)->toBe('completed')
+        ->and($result->decision)->toBeInstanceOf(SupervisorDecisionData::class)
+        ->and($result->decision->action)->toBe('noop');
 });
 
 function packageStubPath(string $relativePath): string
@@ -253,7 +299,7 @@ function storeLifecycleRun(
         'timeline' => [],
     ], $overrides));
 
-    return app(WorkflowStateStore::class)->store($state);
+    return app(\Entrepeneur4lyf\LaravelConductor\Contracts\WorkflowStateStore::class)->store($state);
 }
 
 function makeLifecycleWorkflow(array $steps = [], array $failureHandlers = []): CompiledWorkflowData

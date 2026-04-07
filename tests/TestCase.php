@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Entrepeneur4lyf\LaravelConductor\Tests;
 
 use Atlasphp\Atlas\AtlasServiceProvider;
+use Entrepeneur4lyf\LaravelConductor\Contracts\RunLockProvider;
 use Entrepeneur4lyf\LaravelConductor\LaravelConductorServiceProvider;
+use Entrepeneur4lyf\LaravelConductor\Support\NullRunLockProvider;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use Orchestra\Testbench\TestCase as Orchestra;
@@ -31,6 +33,12 @@ class TestCase extends Orchestra
             'prefix' => '',
             'foreign_key_constraints' => true,
         ]);
+
+        // Replace the default run lock provider with the null implementation
+        // so feature tests stay deterministic and do not depend on a shared
+        // cache backend. Individual tests can rebind this to exercise the
+        // locking path explicitly.
+        $app->bind(RunLockProvider::class, NullRunLockProvider::class);
     }
 
     protected function setUp(): void

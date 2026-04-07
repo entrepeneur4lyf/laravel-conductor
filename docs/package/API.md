@@ -147,6 +147,18 @@ Not found:
 
 - `404` with `{ "message": "Workflow run not found." }`
 
+Conflict:
+
+- `409` with `{ "message": "Run state advanced while your request was processing. Reload and retry." }`
+  if the run revision moved underneath the current request between the lock
+  acquire and the executor call (the layered concurrency model's pre-Atlas
+  re-check). Reload the run dossier and retry against the new revision.
+
+Locked:
+
+- `423` with `{ "message": "Run is currently locked by another request." }`
+  if a concurrent request is already mutating the same run.
+
 ### `GET /runs/{runId}`
 
 Fetch the current stored run dossier.
@@ -201,6 +213,8 @@ Failure modes:
 - `409` with `{ "message": "Run is not waiting." }`
 - `422` with `{ "message": "Invalid resume token." }`
 - `422` if request validation fails
+- `423` with `{ "message": "Run is currently locked by another request." }`
+  if a concurrent request is already mutating the same run.
 
 ### `POST /runs/{runId}/retry`
 
@@ -240,6 +254,8 @@ Failure modes:
 - `409` with `{ "message": "Run revision mismatch." }`
 - `422` with `{ "message": "Run is not eligible for retry." }`
 - `422` if request validation fails
+- `423` with `{ "message": "Run is currently locked by another request." }`
+  if a concurrent request is already mutating the same run.
 
 ### `POST /runs/{runId}/cancel`
 
@@ -277,6 +293,8 @@ Failure modes:
 - `409` with `{ "message": "Run revision mismatch." }`
 - `422` with `{ "message": "Run is not eligible for cancellation." }`
 - `422` if request validation fails
+- `423` with `{ "message": "Run is currently locked by another request." }`
+  if a concurrent request is already mutating the same run.
 
 ## CLI Commands
 
@@ -351,3 +369,5 @@ These are important current-package facts that come directly from the code:
 - the current execution path is synchronous within the request
 - retries are appended to run state, but not automatically queued or delayed by the package today
 - `state.driver` is configurable in config but only the database state store is bound today
+- every mutating run operation (`/continue`, `/resume`, `/retry`, `/cancel`) is wrapped in a `Cache::lock` keyed by the run id via `RunLockProvider`. The lock store, prefix, and TTL are configurable under `conductor.locks`. Requests that cannot acquire the lock get HTTP `423`.
+- run-level concurrency uses a three-layer defense: (1) the cache lock above, which is a cheap first-line rejection and is not load-bearing for correctness; (2) a pre-Atlas revision re-check inside `RunProcessor::continueRun` that catches TTL-expired races before any LLM tokens are spent and surfaces as HTTP `409`; (3) `OptimisticRunMutator`'s `WHERE revision = ?` predicate at the final write, which is the authoritative correctness gate. The default `CONDUCTOR_LOCK_TTL` is intentionally short (60 seconds) so stuck processes recover quickly — do not raise it to "exceed your slowest step", because the TTL is not what prevents concurrent Atlas calls.

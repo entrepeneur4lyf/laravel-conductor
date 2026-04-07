@@ -4,14 +4,13 @@ declare(strict_types=1);
 
 namespace Entrepeneur4lyf\LaravelConductor\Support;
 
+use Closure;
 use Entrepeneur4lyf\LaravelConductor\Contracts\RunLockProvider;
 
 final class NullRunLockProvider implements RunLockProvider
 {
-    public function acquire(string $runId, int $seconds = 15): bool
+    public function withLock(string $runId, Closure $callback, int $blockSeconds = 5): mixed
     {
-        return true;
+        return $callback();
     }
-
-    public function release(string $runId): void {}
 }

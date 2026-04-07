@@ -182,6 +182,39 @@ Current package behavior:
 
 The package is currently explicit and API-driven. Starting a run does not auto-execute the first step.
 
+## Concurrency safety
+
+Concurrent writes against the same run are guarded by a three-layer defense
+rather than a single lock:
+
+1. **Cache lock (cheap rejection).** Every mutating endpoint (`/continue`,
+   `/resume`, `/retry`, `/cancel`) wraps its work in a Laravel cache lock
+   keyed by the run id. Two parallel requests against the same run cannot
+   both reach the executor in the common case; the second one blocks briefly
+   and, if it cannot acquire the lock, receives HTTP `423 Locked` with the
+   body `{"message": "Run is currently locked by another request."}`. The
+   default `CONDUCTOR_LOCK_TTL` is 60 seconds and is intentionally short so
+   stuck processes recover quickly. This layer is *not* load-bearing for
+   correctness — see layers 2 and 3.
+2. **Pre-Atlas revision re-check.** Immediately before the (expensive)
+   executor call inside `RunProcessor::continueRun`, the run is re-read
+   from the state store and its revision is compared against the locally
+   held value. If a previous request's lock TTL expired mid-Atlas-call and
+   another request advanced the run in the meantime, the current request
+   bails with HTTP `409` (`{"message": "Run state advanced while your
+   request was processing. Reload and retry."}`) before any LLM tokens are
+   burned.
+3. **Optimistic concurrency on the final write.** `OptimisticRunMutator`
+   uses `WHERE revision = ?` and is the authoritative correctness gate.
+   Even if both prior layers were skipped, the final persisted state is
+   always consistent.
+
+The lock store, prefix, and TTL are configurable under `conductor.locks` in
+`config/conductor.php`. In single-process tests this can be left at the default
+in-memory cache, but production deployments running multiple workers should
+point `CONDUCTOR_LOCK_STORE` at a shared backend (`redis`, `memcached`, or
+`database`) so locks are visible across workers.
+
 ## HTTP API
 
 Default route prefix:

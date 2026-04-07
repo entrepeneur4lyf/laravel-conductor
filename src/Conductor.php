@@ -4,15 +4,25 @@ declare(strict_types=1);
 
 namespace Entrepeneur4lyf\LaravelConductor;
 
+use Entrepeneur4lyf\LaravelConductor\Contracts\RunLockProvider;
 use Entrepeneur4lyf\LaravelConductor\Contracts\WorkflowStateStore;
 use Entrepeneur4lyf\LaravelConductor\Data\StepExecutionStateData;
 use Entrepeneur4lyf\LaravelConductor\Data\StepOutputData;
+use Entrepeneur4lyf\LaravelConductor\Data\WorkflowRunResultData;
 use Entrepeneur4lyf\LaravelConductor\Data\WorkflowRunStateData;
 use Entrepeneur4lyf\LaravelConductor\Engine\RunProcessor;
 use Entrepeneur4lyf\LaravelConductor\Engine\Supervisor;
 use Entrepeneur4lyf\LaravelConductor\Engine\WorkflowEngine;
+use Entrepeneur4lyf\LaravelConductor\Events\StepRetrying;
+use Entrepeneur4lyf\LaravelConductor\Events\WorkflowCancelled;
+use Entrepeneur4lyf\LaravelConductor\Exceptions\CurrentStepNotFoundException;
+use Entrepeneur4lyf\LaravelConductor\Exceptions\InvalidResumeTokenException;
+use Entrepeneur4lyf\LaravelConductor\Exceptions\RunNotCancellableException;
+use Entrepeneur4lyf\LaravelConductor\Exceptions\RunNotFoundException;
+use Entrepeneur4lyf\LaravelConductor\Exceptions\RunNotRetryableException;
+use Entrepeneur4lyf\LaravelConductor\Exceptions\RunNotWaitingException;
+use Entrepeneur4lyf\LaravelConductor\Exceptions\RunRevisionMismatchException;
 use Entrepeneur4lyf\LaravelConductor\Support\Timeline;
-use RuntimeException;
 
 final class Conductor
 {
@@ -21,7 +31,9 @@ final class Conductor
         private readonly RunProcessor $processor,
         private readonly WorkflowStateStore $stateStore,
         private readonly Supervisor $supervisor,
-    ) {}
+        private readonly RunLockProvider $lockProvider,
+    ) {
+    }
 
     /**
      * @param  array<string, mixed>  $input
@@ -31,11 +43,9 @@ final class Conductor
         return $this->engine->start($workflow, $input);
     }
 
-    public function continueRun(string $runId): ?WorkflowRunStateData
+    public function continueRun(string $runId): WorkflowRunResultData
     {
-        $this->processor->continueRun($runId);
-
-        return $this->stateStore->get($runId);
+        return $this->processor->continueRun($runId);
     }
 
     public function getRun(string $runId): ?WorkflowRunStateData
@@ -46,143 +56,165 @@ final class Conductor
     /**
      * @param  array<string, mixed>  $payload
      */
-    public function resumeRun(string $runId, string $resumeToken, array $payload = []): WorkflowRunStateData
+    public function resumeRun(string $runId, string $resumeToken, array $payload = []): WorkflowRunResultData
     {
-        $run = $this->requireRun($runId);
+        return $this->lockProvider->withLock($runId, function () use ($runId, $resumeToken, $payload): WorkflowRunResultData {
+            $run = $this->requireRun($runId);
 
-        if ($run->status !== 'waiting' || $run->wait === null || $run->current_step_id === null) {
-            throw new RuntimeException('Run is not waiting.');
-        }
+            if ($run->status !== 'waiting' || $run->wait === null || $run->current_step_id === null) {
+                throw new RunNotWaitingException($runId);
+            }
 
-        if ($resumeToken !== $run->wait->resume_token) {
-            throw new RuntimeException('Invalid resume token.');
-        }
+            if ($resumeToken !== $run->wait->resume_token) {
+                throw new InvalidResumeTokenException($runId);
+            }
 
-        $step = $this->latestStep($run, $run->current_step_id);
+            $step = $this->latestStep($run, $run->current_step_id);
 
-        if ($step === null) {
-            throw new RuntimeException('Current step not found.');
-        }
+            if ($step === null) {
+                throw new CurrentStepNotFoundException($runId, $run->current_step_id);
+            }
 
-        $updatedRun = $this->stateStore->save(
-            WorkflowRunStateData::from([
-                ...$run->toArray(),
-                'revision' => $run->revision + 1,
-                'status' => 'running',
-                'wait' => null,
-                'timeline' => array_map(
-                    static fn ($entry) => $entry->toArray(),
-                    Timeline::append(
-                        $run->timeline,
-                        'workflow_resumed',
-                        'Workflow resumed from a waiting state.',
-                        ['step_id' => $run->current_step_id],
+            $updatedRun = $this->stateStore->save(
+                WorkflowRunStateData::from([
+                    ...$run->toArray(),
+                    'revision' => $run->revision + 1,
+                    'status' => 'running',
+                    'wait' => null,
+                    'timeline' => array_map(
+                        static fn ($entry) => $entry->toArray(),
+                        Timeline::append(
+                            $run->timeline,
+                            'workflow_resumed',
+                            'Workflow resumed from a waiting state.',
+                            ['step_id' => $run->current_step_id],
+                        ),
                     ),
-                ),
-                'steps' => $this->replaceLatestStep(
-                    $run,
-                    $run->current_step_id,
-                    StepExecutionStateData::from([
-                        ...$step->toArray(),
-                        'status' => 'completed',
-                        'output' => StepOutputData::from([
-                            'step_id' => $run->current_step_id,
-                            'run_id' => $run->id,
+                    'steps' => $this->replaceLatestStep(
+                        $run,
+                        $run->current_step_id,
+                        StepExecutionStateData::from([
+                            ...$step->toArray(),
                             'status' => 'completed',
-                            'payload' => $payload,
+                            'output' => StepOutputData::from([
+                                'step_id' => $run->current_step_id,
+                                'run_id' => $run->id,
+                                'status' => 'completed',
+                                'payload' => $payload,
+                            ])->toArray(),
+                            'supervisor_decision' => null,
+                            'supervisor_feedback' => null,
+                            'completed_at' => now('UTC')->toIso8601String(),
                         ])->toArray(),
-                        'supervisor_decision' => null,
-                        'supervisor_feedback' => null,
-                        'completed_at' => now('UTC')->toIso8601String(),
-                    ])->toArray(),
-                ),
-            ]),
-            $run->revision,
-        );
+                    ),
+                ]),
+                $run->revision,
+            );
 
-        $this->supervisor->evaluate($updatedRun->id, $updatedRun->current_step_id ?? $run->current_step_id);
+            $decision = $this->supervisor->evaluate(
+                $updatedRun->id,
+                $updatedRun->current_step_id ?? $run->current_step_id,
+            );
 
-        return $this->requireRun($runId);
+            $fresh = $this->stateStore->get($runId) ?? $updatedRun;
+
+            return new WorkflowRunResultData(
+                run: $fresh,
+                decision: $decision,
+            );
+        });
     }
 
     public function retryRun(string $runId, int $revision): WorkflowRunStateData
     {
-        $run = $this->requireRun($runId);
+        return $this->lockProvider->withLock($runId, function () use ($runId, $revision): WorkflowRunStateData {
+            $run = $this->requireRun($runId);
 
-        if ($revision !== $run->revision) {
-            throw new RuntimeException('Run revision mismatch.');
-        }
+            if ($revision !== $run->revision) {
+                throw new RunRevisionMismatchException($runId, $revision, $run->revision);
+            }
 
-        if ($run->status !== 'failed' || $run->current_step_id === null) {
-            throw new RuntimeException('Run is not eligible for retry.');
-        }
+            if ($run->status !== 'failed' || $run->current_step_id === null) {
+                throw new RunNotRetryableException($runId);
+            }
 
-        $step = $this->latestStep($run, $run->current_step_id);
+            $step = $this->latestStep($run, $run->current_step_id);
 
-        if ($step === null) {
-            throw new RuntimeException('Current step not found.');
-        }
+            if ($step === null) {
+                throw new CurrentStepNotFoundException($runId, $run->current_step_id);
+            }
 
-        $steps = array_map(
-            static fn (StepExecutionStateData $existing): array => $existing->toArray(),
-            $run->steps,
-        );
-        $steps[] = StepExecutionStateData::from([
-            'step_definition_id' => $run->current_step_id,
-            'status' => 'pending',
-            'attempt' => $step->attempt + 1,
-        ])->toArray();
+            $steps = array_map(
+                static fn (StepExecutionStateData $existing): array => $existing->toArray(),
+                $run->steps,
+            );
+            $steps[] = StepExecutionStateData::from([
+                'step_definition_id' => $run->current_step_id,
+                'status' => 'pending',
+                'attempt' => $step->attempt + 1,
+            ])->toArray();
 
-        return $this->stateStore->save(
-            WorkflowRunStateData::from([
-                ...$run->toArray(),
-                'revision' => $run->revision + 1,
-                'status' => 'running',
-                'timeline' => array_map(
-                    static fn ($entry) => $entry->toArray(),
-                    Timeline::append(
-                        $run->timeline,
-                        'step_retried',
-                        'Manual retry requested.',
-                        ['step_id' => $run->current_step_id, 'attempt' => $step->attempt + 1],
+            $updatedRun = $this->stateStore->save(
+                WorkflowRunStateData::from([
+                    ...$run->toArray(),
+                    'revision' => $run->revision + 1,
+                    'status' => 'running',
+                    'timeline' => array_map(
+                        static fn ($entry) => $entry->toArray(),
+                        Timeline::append(
+                            $run->timeline,
+                            'step_retried',
+                            'Manual retry requested.',
+                            ['step_id' => $run->current_step_id, 'attempt' => $step->attempt + 1],
+                        ),
                     ),
-                ),
-                'steps' => $steps,
-            ]),
-            $run->revision,
-        );
+                    'steps' => $steps,
+                ]),
+                $run->revision,
+            );
+
+            event(new StepRetrying($updatedRun, $run->current_step_id, 'Manual retry requested.'));
+
+            return $updatedRun;
+        });
     }
 
     public function cancelRun(string $runId, int $revision): WorkflowRunStateData
     {
-        $run = $this->requireRun($runId);
+        return $this->lockProvider->withLock($runId, function () use ($runId, $revision): WorkflowRunStateData {
+            $run = $this->requireRun($runId);
 
-        if ($revision !== $run->revision) {
-            throw new RuntimeException('Run revision mismatch.');
-        }
+            if ($revision !== $run->revision) {
+                throw new RunRevisionMismatchException($runId, $revision, $run->revision);
+            }
 
-        if (in_array($run->status, ['completed', 'failed', 'cancelled'], true)) {
-            throw new RuntimeException('Run is not eligible for cancellation.');
-        }
+            if (in_array($run->status, ['completed', 'failed', 'cancelled'], true)) {
+                throw new RunNotCancellableException($runId);
+            }
 
-        return $this->stateStore->save(
-            WorkflowRunStateData::from([
-                ...$run->toArray(),
-                'revision' => $run->revision + 1,
-                'status' => 'cancelled',
-                'current_step_id' => null,
-                'wait' => null,
-                'timeline' => array_map(
-                    static fn ($entry) => $entry->toArray(),
-                    Timeline::append(
-                        $run->timeline,
-                        'workflow_cancelled',
-                        'Manual cancellation requested.',
+            $updatedRun = $this->stateStore->save(
+                WorkflowRunStateData::from([
+                    ...$run->toArray(),
+                    'revision' => $run->revision + 1,
+                    'status' => 'cancelled',
+                    'current_step_id' => null,
+                    'wait' => null,
+                    'timeline' => array_map(
+                        static fn ($entry) => $entry->toArray(),
+                        Timeline::append(
+                            $run->timeline,
+                            'workflow_cancelled',
+                            'Manual cancellation requested.',
+                        ),
                     ),
-                ),
-            ]),
-            $run->revision,
-        );
+                ]),
+                $run->revision,
+            );
+
+            event(new WorkflowCancelled($updatedRun, 'Manual cancellation requested.'));
+
+            return $updatedRun;
+        });
     }
 
     private function requireRun(string $runId): WorkflowRunStateData
@@ -190,7 +222,7 @@ final class Conductor
         $run = $this->stateStore->get($runId);
 
         if ($run === null) {
-            throw new RuntimeException(sprintf('Workflow run [%s] was not found.', $runId));
+            throw new RunNotFoundException($runId);
         }
 
         return $run;
@@ -211,6 +243,7 @@ final class Conductor
     }
 
     /**
+     * @param  array<string, mixed>  $replacement
      * @return array<int, array<string, mixed>>
      */
     private function replaceLatestStep(
