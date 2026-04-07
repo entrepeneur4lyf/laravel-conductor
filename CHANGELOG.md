@@ -4,6 +4,7 @@ All notable changes to `entrepeneur4lyf/laravel-conductor` will be documented in
 
 ## Unreleased
 
+- removed the inert `configure.php` post-install scaffolding left over from the Spatie package skeleton. The placeholder strings it searched for have been hard-replaced throughout the package since initial extraction, so the script was dead code.
 - failure handler `delay` is now enforced via a persisted `retry_after` timestamp on the run dossier; `/continue` short-circuits with a `noop` decision while the backoff is active. Adds `retry_after` to the `pipeline_runs` table, the `PipelineRun` Eloquent model, and `WorkflowRunStateData`. Every non-retry state transition (success, failure, resume, manual retry, cancel) clears the backoff. Escalation-driven retries do not set `retry_after`.
 - added a Cache::lock-backed `RunLockProvider` so concurrent `/continue`, `/resume`, `/retry`, and `/cancel` requests against the same workflow run can no longer race; locked requests now respond with HTTP `423 Locked`
 - centralized continue, resume, retry, and cancel HTTP handling on `Conductor::continueRun/resumeRun/retryRun/cancelRun`, rebuilt `Conductor::continueRun` and `RunProcessor::continueRun` to return a `WorkflowRunResultData` assembled inside the lock (fixing a stale-read window between the processor call and the post-lock state fetch), and replaced internal `RuntimeException` throws with typed exceptions in `Entrepeneur4lyf\LaravelConductor\Exceptions\*`
