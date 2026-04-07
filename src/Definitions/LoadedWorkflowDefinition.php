@@ -11,6 +11,5 @@ final readonly class LoadedWorkflowDefinition
     public function __construct(
         public WorkflowDefinitionData $definition,
         public string $sourcePath,
-    ) {
-    }
+    ) {}
 }

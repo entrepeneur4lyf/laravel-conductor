@@ -25,7 +25,7 @@ final class TemplateRenderer
     {
         $templatePath = $displayPath ?? 'inline-template';
         $this->assertStandaloneTemplate($templateContents, $templatePath);
-        $twig = $this->createEnvironment(new ArrayLoader());
+        $twig = $this->createEnvironment(new ArrayLoader);
 
         try {
             $twig->createTemplate($templateContents);

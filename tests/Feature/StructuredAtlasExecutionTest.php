@@ -3,18 +3,18 @@
 declare(strict_types=1);
 
 use Atlasphp\Atlas\Agent;
+use Atlasphp\Atlas\AgentRegistry;
 use Atlasphp\Atlas\Atlas;
 use Atlasphp\Atlas\Enums\Provider;
+use Atlasphp\Atlas\Requests\TextRequest;
 use Atlasphp\Atlas\Responses\Usage;
 use Atlasphp\Atlas\Schema\Schema;
-use Atlasphp\Atlas\Requests\TextRequest;
 use Atlasphp\Atlas\Testing\StructuredResponseFake;
 use Atlasphp\Atlas\Testing\TextResponseFake;
 use Entrepeneur4lyf\LaravelConductor\Contracts\WorkflowStepExecutor;
 use Entrepeneur4lyf\LaravelConductor\Data\StepInputData;
 use Entrepeneur4lyf\LaravelConductor\Data\StepOutputData;
 use Entrepeneur4lyf\LaravelConductor\Execution\AtlasStepExecutor;
-use Atlasphp\Atlas\AgentRegistry;
 
 class StructuredExecutionTestAgent extends Agent
 {

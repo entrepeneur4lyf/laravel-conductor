@@ -22,6 +22,5 @@ final class CompiledWorkflowData extends Data
         public array $failure_handlers = [],
         public array $defaults = [],
         public ?string $description = null,
-    ) {
-    }
+    ) {}
 }

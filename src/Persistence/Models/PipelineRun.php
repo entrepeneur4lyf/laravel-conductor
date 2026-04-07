@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Entrepeneur4lyf\LaravelConductor\Persistence\Models;
 
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -21,7 +22,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property array<string, mixed>|null $output
  * @property array<string, mixed>|null $context
  * @property array<int, array<string, mixed>>|null $timeline
- * @property-read \Illuminate\Database\Eloquent\Collection<int, StepRun> $stepRuns
+ * @property-read Collection<int, StepRun> $stepRuns
  */
 final class PipelineRun extends Model
 {

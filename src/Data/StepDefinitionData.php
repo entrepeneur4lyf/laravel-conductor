@@ -30,6 +30,5 @@ final class StepDefinitionData extends Data
         public array $tools = [],
         public array $provider_tools = [],
         public array $meta = [],
-    ) {
-    }
+    ) {}
 }

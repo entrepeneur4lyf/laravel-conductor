@@ -8,6 +8,9 @@ use Atlasphp\Atlas\Atlas;
 use Atlasphp\Atlas\Enums\Provider;
 use Atlasphp\Atlas\Responses\Usage;
 use Atlasphp\Atlas\Testing\StructuredResponseFake;
+use Entrepeneur4lyf\LaravelConductor\Contracts\WorkflowStateStore;
+use Entrepeneur4lyf\LaravelConductor\Data\StepExecutionStateData;
+use Entrepeneur4lyf\LaravelConductor\Data\WorkflowRunStateData;
 
 class ContinueWorkflowTestAgent extends Agent
 {
@@ -155,17 +158,17 @@ YAML);
 
     $runId = (string) $started['id'];
 
-    $store = app(\Entrepeneur4lyf\LaravelConductor\Contracts\WorkflowStateStore::class);
+    $store = app(WorkflowStateStore::class);
     $run = $store->get($runId);
     expect($run)->not->toBeNull();
 
     $failed = $store->save(
-        \Entrepeneur4lyf\LaravelConductor\Data\WorkflowRunStateData::from([
+        WorkflowRunStateData::from([
             ...$run?->toArray(),
             'revision' => 2,
             'status' => 'failed',
             'steps' => [
-                \Entrepeneur4lyf\LaravelConductor\Data\StepExecutionStateData::from([
+                StepExecutionStateData::from([
                     ...$run?->steps[0]->toArray(),
                     'status' => 'failed',
                     'error' => 'manual_failure',

@@ -13,6 +13,5 @@ final class WaitStateData extends Data
         public string $resume_token,
         public ?string $timeout_at = null,
         public array $metadata = [],
-    ) {
-    }
+    ) {}
 }

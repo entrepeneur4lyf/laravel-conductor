@@ -20,6 +20,5 @@ final class StepExecutionStateData extends Data
         public ?string $prompt_override = null,
         public ?string $supervisor_feedback = null,
         public ?string $completed_at = null,
-    ) {
-    }
+    ) {}
 }

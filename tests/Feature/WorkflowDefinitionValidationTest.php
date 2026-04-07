@@ -302,7 +302,7 @@ it('loads named workflow definitions from configured search roots before the cwd
     $originalDefinitionPaths = config('conductor.definitions.paths');
     $fixtureDirectory = copyWorkflowFixturesToTemp();
     $cwdWorkflowPath = getcwd().'/content-pipeline.yaml';
-    $cwdWorkflowContents = <<<YAML
+    $cwdWorkflowContents = <<<'YAML'
 name: cwd-content-pipeline
 version: 1
 steps:
@@ -586,7 +586,7 @@ it('rejects malformed twig prompt templates on failure handlers during compilati
     $sourcePath = $fixtureDirectory.'/content-pipeline.yaml';
     $templatePath = $fixtureDirectory.'/prompts/invalid-failure-template.j2';
 
-    if (file_put_contents($templatePath, "{{ title") === false) {
+    if (file_put_contents($templatePath, '{{ title') === false) {
         throw new RuntimeException(sprintf('Unable to write malformed template file [%s].', $templatePath));
     }
 

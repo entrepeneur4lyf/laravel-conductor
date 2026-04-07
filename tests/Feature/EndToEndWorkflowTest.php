@@ -150,12 +150,12 @@ it('proves the end-to-end workflow runtime semantics', function (): void {
         ->and($terminalRun?->revision)->toBe(6)
         ->and($terminalRun?->timeline)->toHaveCount(4)
         ->and(array_map(static fn ($entry) => $entry->type, $terminalRun?->timeline ?? []))
-            ->toBe([
-                'workflow_started',
-                'step_waiting',
-                'workflow_resumed',
-                'workflow_completed',
-            ]);
+        ->toBe([
+            'workflow_started',
+            'step_waiting',
+            'workflow_resumed',
+            'workflow_completed',
+        ]);
 
     $this->postJson("/api/conductor/runs/{$runId}/cancel", [
         'revision' => 6,

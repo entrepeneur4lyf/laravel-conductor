@@ -15,6 +15,5 @@ final class FailureHandlerData extends Data
         public ?string $prompt_template = null,
         public ?string $prompt_template_path = null,
         public ?string $prompt_template_contents = null,
-    ) {
-    }
+    ) {}
 }

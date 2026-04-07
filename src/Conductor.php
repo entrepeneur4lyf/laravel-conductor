@@ -21,8 +21,7 @@ final class Conductor
         private readonly RunProcessor $processor,
         private readonly WorkflowStateStore $stateStore,
         private readonly Supervisor $supervisor,
-    ) {
-    }
+    ) {}
 
     /**
      * @param  array<string, mixed>  $input

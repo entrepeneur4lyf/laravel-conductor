@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use Entrepeneur4lyf\LaravelConductor\Contracts\WorkflowStateStore;
 use Entrepeneur4lyf\LaravelConductor\Data\StepExecutionStateData;
 use Entrepeneur4lyf\LaravelConductor\Data\WaitStateData;
 

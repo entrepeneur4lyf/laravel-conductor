@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
+use Entrepeneur4lyf\LaravelConductor\Conductor;
+use Entrepeneur4lyf\LaravelConductor\Contracts\RunLockProvider;
+use Entrepeneur4lyf\LaravelConductor\Contracts\WorkflowStateStore;
 use Entrepeneur4lyf\LaravelConductor\Data\CompiledWorkflowData;
 use Entrepeneur4lyf\LaravelConductor\Data\FailureHandlerData;
 use Entrepeneur4lyf\LaravelConductor\Data\StepDefinitionData;
 use Entrepeneur4lyf\LaravelConductor\Data\StepExecutionStateData;
 use Entrepeneur4lyf\LaravelConductor\Data\WorkflowRunStateData;
-use Entrepeneur4lyf\LaravelConductor\Facades\Conductor as ConductorFacade;
-use Entrepeneur4lyf\LaravelConductor\Contracts\RunLockProvider;
-use Entrepeneur4lyf\LaravelConductor\Conductor;
 use Entrepeneur4lyf\LaravelConductor\Engine\Supervisor;
 use Entrepeneur4lyf\LaravelConductor\Engine\WorkflowEngine;
 use Entrepeneur4lyf\LaravelConductor\Events\RunWaiting;
@@ -18,6 +18,7 @@ use Entrepeneur4lyf\LaravelConductor\Events\WorkflowCancelled;
 use Entrepeneur4lyf\LaravelConductor\Events\WorkflowCompleted;
 use Entrepeneur4lyf\LaravelConductor\Events\WorkflowFailed;
 use Entrepeneur4lyf\LaravelConductor\Events\WorkflowStarted;
+use Entrepeneur4lyf\LaravelConductor\Facades\Conductor as ConductorFacade;
 use Illuminate\Support\Facades\Event;
 
 it('registers the conductor artisan commands', function (): void {
@@ -252,7 +253,7 @@ function storeLifecycleRun(
         'timeline' => [],
     ], $overrides));
 
-    return app(\Entrepeneur4lyf\LaravelConductor\Contracts\WorkflowStateStore::class)->store($state);
+    return app(WorkflowStateStore::class)->store($state);
 }
 
 function makeLifecycleWorkflow(array $steps = [], array $failureHandlers = []): CompiledWorkflowData

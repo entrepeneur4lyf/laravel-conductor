@@ -13,7 +13,5 @@ final class NullRunLockProvider implements RunLockProvider
         return true;
     }
 
-    public function release(string $runId): void
-    {
-    }
+    public function release(string $runId): void {}
 }

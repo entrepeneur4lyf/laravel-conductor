@@ -8,7 +8,5 @@ use Entrepeneur4lyf\LaravelConductor\Data\WorkflowRunStateData;
 
 final class WorkflowCompleted
 {
-    public function __construct(public readonly WorkflowRunStateData $run)
-    {
-    }
+    public function __construct(public readonly WorkflowRunStateData $run) {}
 }

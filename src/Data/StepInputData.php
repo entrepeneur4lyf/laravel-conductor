@@ -15,6 +15,5 @@ final class StepInputData extends Data
         public array $payload = [],
         public ?StepOutputData $previous_output = null,
         public array $meta = [],
-    ) {
-    }
+    ) {}
 }

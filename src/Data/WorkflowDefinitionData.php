@@ -20,6 +20,5 @@ final class WorkflowDefinitionData extends Data
         #[DataCollectionOf(FailureHandlerData::class)]
         public array $failure_handlers = [],
         public array $defaults = [],
-    ) {
-    }
+    ) {}
 }

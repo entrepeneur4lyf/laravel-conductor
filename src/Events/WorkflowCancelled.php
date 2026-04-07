@@ -11,6 +11,5 @@ final class WorkflowCancelled
     public function __construct(
         public readonly WorkflowRunStateData $run,
         public readonly string $reason,
-    ) {
-    }
+    ) {}
 }

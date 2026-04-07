@@ -18,14 +18,12 @@ final class WorkflowCompiler
         private readonly WorkflowDefinitionValidator $validator,
         private readonly TemplateRenderer $templateRenderer,
         private readonly SchemaValidator $schemaValidator,
-    ) {
-    }
+    ) {}
 
     public function compile(
         WorkflowDefinitionData|LoadedWorkflowDefinition $definition,
         ?string $sourcePath = null,
-    ): CompiledWorkflowData
-    {
+    ): CompiledWorkflowData {
         [$definition, $sourcePath] = $this->normalizeCompileInput($definition, $sourcePath);
 
         $this->validator->validate($definition, $sourcePath);
@@ -166,8 +164,6 @@ final class WorkflowCompiler
         return $contents;
     }
 
-    /**
-     */
     private function updateHashWithAsset(\HashContext $hash, ?string $reference, ?string $contents): void
     {
         if ($reference === null) {

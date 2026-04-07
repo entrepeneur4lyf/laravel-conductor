@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Entrepeneur4lyf\LaravelConductor\Definitions;
 
-use Entrepeneur4lyf\LaravelConductor\Data\WorkflowDefinitionData;
 use Entrepeneur4lyf\LaravelConductor\Data\FailureHandlerData;
 use Entrepeneur4lyf\LaravelConductor\Data\StepDefinitionData;
+use Entrepeneur4lyf\LaravelConductor\Data\WorkflowDefinitionData;
 use Entrepeneur4lyf\LaravelConductor\Engine\SchemaValidator;
 use Entrepeneur4lyf\LaravelConductor\Engine\TemplateRenderer;
 
@@ -33,8 +33,7 @@ final class WorkflowDefinitionValidator
     public function __construct(
         private readonly TemplateRenderer $templateRenderer,
         private readonly SchemaValidator $schemaValidator,
-    ) {
-    }
+    ) {}
 
     public function validate(WorkflowDefinitionData $definition, string $sourcePath): void
     {

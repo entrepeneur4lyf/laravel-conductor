@@ -15,6 +15,5 @@ final class SupervisorDecisionData extends Data
         public ?string $modified_prompt = null,
         public ?float $confidence = null,
         public ?int $delay = null,
-    ) {
-    }
+    ) {}
 }

@@ -2,8 +2,8 @@
 
 use Entrepeneur4lyf\LaravelConductor\Conductor;
 use Entrepeneur4lyf\LaravelConductor\Contracts\WorkflowStateStore;
-use Entrepeneur4lyf\LaravelConductor\LaravelConductorServiceProvider;
 use Entrepeneur4lyf\LaravelConductor\Facades\Conductor as ConductorFacade;
+use Entrepeneur4lyf\LaravelConductor\LaravelConductorServiceProvider;
 use Entrepeneur4lyf\LaravelConductor\Persistence\DatabaseWorkflowStateStore;
 
 it('boots the conductor service provider', function (): void {

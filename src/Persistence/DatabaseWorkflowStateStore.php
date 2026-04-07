@@ -13,8 +13,7 @@ final class DatabaseWorkflowStateStore implements WorkflowStateStore
 {
     public function __construct(
         private readonly OptimisticRunMutator $mutator,
-    ) {
-    }
+    ) {}
 
     public function store(WorkflowRunStateData $state): WorkflowRunStateData
     {

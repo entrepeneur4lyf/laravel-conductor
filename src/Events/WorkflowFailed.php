@@ -12,6 +12,5 @@ final class WorkflowFailed
         public readonly WorkflowRunStateData $run,
         public readonly string $stepId,
         public readonly string $reason,
-    ) {
-    }
+    ) {}
 }

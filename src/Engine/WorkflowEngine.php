@@ -20,8 +20,7 @@ final class WorkflowEngine
         private readonly DefinitionRepository $definitions,
         private readonly WorkflowCompiler $compiler,
         private readonly WorkflowStateStore $stateStore,
-    ) {
-    }
+    ) {}
 
     /**
      * @param  array<string, mixed>  $input

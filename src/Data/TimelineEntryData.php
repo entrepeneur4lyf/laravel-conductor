@@ -13,6 +13,5 @@ final class TimelineEntryData extends Data
         public string $message,
         public array $context = [],
         public ?string $occurred_at = null,
-    ) {
-    }
+    ) {}
 }

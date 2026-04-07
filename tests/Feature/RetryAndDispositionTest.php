@@ -7,8 +7,6 @@ use Entrepeneur4lyf\LaravelConductor\Data\CompiledWorkflowData;
 use Entrepeneur4lyf\LaravelConductor\Data\FailureHandlerData;
 use Entrepeneur4lyf\LaravelConductor\Data\StepDefinitionData;
 use Entrepeneur4lyf\LaravelConductor\Data\StepExecutionStateData;
-use Entrepeneur4lyf\LaravelConductor\Data\StepOutputData;
-use Entrepeneur4lyf\LaravelConductor\Data\SupervisorDecisionData;
 use Entrepeneur4lyf\LaravelConductor\Data\WorkflowRunStateData;
 use Entrepeneur4lyf\LaravelConductor\Engine\Supervisor;
 use Entrepeneur4lyf\LaravelConductor\Engine\WorkflowEngine;

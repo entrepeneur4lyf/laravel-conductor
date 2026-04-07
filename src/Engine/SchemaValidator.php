@@ -41,7 +41,7 @@ final class SchemaValidator
         $schema = $this->decodeSchemaContents($schemaContents, $displayPath);
         $this->assertSupportedRefs($schema, $displayPath);
 
-        $validator = new Validator();
+        $validator = new Validator;
         $validator->check($schema, (object) ['$ref' => 'http://json-schema.org/draft-07/schema#']);
 
         if ($validator->isValid()) {
@@ -72,7 +72,7 @@ final class SchemaValidator
     {
         $schema = $this->decodeSchemaContents($schemaContents, $displayPath);
         $normalizedPayload = $this->normalizeJsonLikeValue($payload);
-        $validator = new Validator();
+        $validator = new Validator;
         $validator->validate($normalizedPayload, $schema);
 
         if ($validator->isValid()) {

@@ -14,8 +14,7 @@ final class YamlWorkflowDefinitionRepository implements DefinitionRepository
 {
     public function __construct(
         private readonly ConfigRepository $config,
-    ) {
-    }
+    ) {}
 
     public function load(string $workflow): LoadedWorkflowDefinition
     {
@@ -87,9 +86,6 @@ final class YamlWorkflowDefinitionRepository implements DefinitionRepository
         ));
     }
 
-    /**
-     * @return mixed
-     */
     private function loadJson(string $sourcePath): mixed
     {
         $contents = file_get_contents($sourcePath);
@@ -111,9 +107,6 @@ final class YamlWorkflowDefinitionRepository implements DefinitionRepository
         return $decoded;
     }
 
-    /**
-     * @return mixed
-     */
     private function loadYaml(string $sourcePath): mixed
     {
         try {
@@ -136,7 +129,7 @@ final class YamlWorkflowDefinitionRepository implements DefinitionRepository
     private function isBareWorkflowName(string $workflow): bool
     {
         return ! $this->isAbsolutePath($workflow)
-            && strpbrk($workflow, "/\\") === false;
+            && strpbrk($workflow, '/\\') === false;
     }
 
     private function isAbsolutePath(string $path): bool

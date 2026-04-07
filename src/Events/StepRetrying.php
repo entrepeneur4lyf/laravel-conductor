@@ -12,6 +12,5 @@ final class StepRetrying
         public readonly WorkflowRunStateData $run,
         public readonly string $stepId,
         public readonly string $reason,
-    ) {
-    }
+    ) {}
 }

@@ -15,6 +15,5 @@ final class StepOutputData extends Data
         public array $payload = [],
         public ?string $error = null,
         public array $metadata = [],
-    ) {
-    }
+    ) {}
 }

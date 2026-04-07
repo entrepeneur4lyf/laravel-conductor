@@ -31,8 +31,7 @@ final class Supervisor
         private readonly QualityRuleEvaluator $qualityRuleEvaluator,
         private readonly IdempotencyGuard $idempotencyGuard,
         private readonly EscalationEvaluator $escalationEvaluator,
-    ) {
-    }
+    ) {}
 
     public function evaluate(string $runId, string $stepId): SupervisorDecisionData
     {

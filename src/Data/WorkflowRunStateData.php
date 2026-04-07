@@ -27,6 +27,5 @@ final class WorkflowRunStateData extends Data
         /** @var array<int, TimelineEntryData> */
         #[DataCollectionOf(TimelineEntryData::class)]
         public array $timeline = [],
-    ) {
-    }
+    ) {}
 }
