@@ -26,6 +26,8 @@ use Entrepeneur4lyf\LaravelConductor\Execution\AtlasStepExecutor;
 use Entrepeneur4lyf\LaravelConductor\Persistence\DatabaseWorkflowStateStore;
 use Entrepeneur4lyf\LaravelConductor\Persistence\OptimisticRunMutator;
 use Entrepeneur4lyf\LaravelConductor\Support\CacheLockRunLockProvider;
+use Entrepeneur4lyf\LaravelConductor\Tools\ProviderToolResolver;
+use Entrepeneur4lyf\LaravelConductor\Tools\ToolResolver;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
 
@@ -45,7 +47,15 @@ final class LaravelConductorServiceProvider extends PackageServiceProvider
         $this->app->singleton(DefinitionRepository::class, YamlWorkflowDefinitionRepository::class);
         $this->app->singleton(RunLockProvider::class, CacheLockRunLockProvider::class);
         $this->app->singleton(WorkflowStateStore::class, DatabaseWorkflowStateStore::class);
-        $this->app->singleton(WorkflowStepExecutor::class, AtlasStepExecutor::class);
+        $this->app->singleton(ToolResolver::class);
+        $this->app->singleton(ProviderToolResolver::class);
+        $this->app->singleton(
+            WorkflowStepExecutor::class,
+            fn ($app) => new AtlasStepExecutor(
+                toolResolver: $app->make(ToolResolver::class),
+                providerToolResolver: $app->make(ProviderToolResolver::class),
+            ),
+        );
     }
 
     public function packageBooted(): void

@@ -5,22 +5,43 @@ declare(strict_types=1);
 namespace Entrepeneur4lyf\LaravelConductor\Execution;
 
 use Atlasphp\Atlas\Atlas;
+use Atlasphp\Atlas\Providers\Tools\ProviderTool;
 use Atlasphp\Atlas\Responses\StructuredResponse;
 use Atlasphp\Atlas\Responses\TextResponse;
 use Atlasphp\Atlas\Schema\Schema;
+use Atlasphp\Atlas\Tools\Tool;
 use Entrepeneur4lyf\LaravelConductor\Contracts\WorkflowStepExecutor;
 use Entrepeneur4lyf\LaravelConductor\Data\StepInputData;
 use Entrepeneur4lyf\LaravelConductor\Data\StepOutputData;
+use Entrepeneur4lyf\LaravelConductor\Tools\ProviderToolResolver;
+use Entrepeneur4lyf\LaravelConductor\Tools\ToolResolver;
 use RuntimeException;
 
 final class AtlasStepExecutor implements WorkflowStepExecutor
 {
+    public function __construct(
+        private readonly ToolResolver $toolResolver,
+        private readonly ProviderToolResolver $providerToolResolver,
+    ) {}
+
     public function execute(string $agent, StepInputData $input): StepOutputData
     {
         $request = Atlas::agent($agent)
             ->withMeta($input->meta)
             ->message($input->rendered_prompt);
 
+        // ── Tools ──────────────────────────────────────
+        $tools = $this->resolveTools($input);
+        if ($tools !== []) {
+            $request->withTools($tools);
+        }
+
+        $providerTools = $this->resolveProviderTools($input);
+        if ($providerTools !== []) {
+            $request->withProviderTools($providerTools);
+        }
+
+        // ── Schema ─────────────────────────────────────
         $schemaPath = $this->schemaPath($input);
 
         if ($schemaPath !== null) {
@@ -36,6 +57,38 @@ final class AtlasStepExecutor implements WorkflowStepExecutor
         $response = $request->asText();
 
         return $this->toTextOutput($input, $response);
+    }
+
+    /**
+     * Resolve tool identifiers from step meta into Atlas Tool class names.
+     *
+     * @return array<int, class-string<Tool>>
+     */
+    private function resolveTools(StepInputData $input): array
+    {
+        $toolIds = $input->meta['tools'] ?? [];
+
+        if (! is_array($toolIds) || $toolIds === []) {
+            return [];
+        }
+
+        return $this->toolResolver->resolveMany($toolIds);
+    }
+
+    /**
+     * Resolve provider tool declarations from step meta into ProviderTool instances.
+     *
+     * @return array<int, ProviderTool>
+     */
+    private function resolveProviderTools(StepInputData $input): array
+    {
+        $declarations = $input->meta['provider_tools'] ?? [];
+
+        if (! is_array($declarations) || $declarations === []) {
+            return [];
+        }
+
+        return $this->providerToolResolver->resolveMany($declarations);
     }
 
     private function schemaPath(StepInputData $input): ?string

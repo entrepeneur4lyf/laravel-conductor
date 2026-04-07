@@ -35,10 +35,9 @@ Important so nobody gets surprised:
 - it does not auto-dispatch the first step when you call `start`
 - it does not currently queue step execution in the background
 - it does not currently implement parallel fan-out execution from `parallel` and `foreach`
-- it does not currently execute `tools` or `provider_tools`
 - it does not currently consume `on_fail` transition semantics
 
-Those fields exist in the definition model, but the runtime has a narrower active surface right now.
+Those fields exist in the definition model, but the runtime has a narrower active surface right now. `tools` and `provider_tools` are now resolved and forwarded to Atlas at execution time — see the "Tools" section below for the resolution strategies.
 
 ## Requirements
 
@@ -169,6 +168,43 @@ workflows/
     research-output.json
     approval-output.json
 ```
+
+## Tools
+
+Steps may declare host-defined Atlas `tools` and provider-native
+`provider_tools`. Both are resolved at execution time and forwarded to
+the Atlas request via `withTools()` / `withProviderTools()`.
+
+```yaml
+steps:
+  - id: research
+    agent: research-agent
+    prompt_template: prompts/research.md.j2
+    tools:
+      - stock_snapshot             # convention → App\Tools\StockSnapshotTool
+      - web_lookup                 # convention → App\Tools\WebLookupTool
+      - \App\Custom\SpecialTool    # FQCN passthrough
+    provider_tools:
+      - web_search                 # Atlas\Providers\Tools\WebSearch
+      - type: file_search          # with options
+        max_results: 5
+```
+
+`tools` identifiers are resolved in three strategies (in precedence
+order):
+
+1. An explicit `conductor.tools.map` entry.
+2. A fully-qualified class name passed directly.
+3. A convention-based lookup under `conductor.tools.namespace`
+   (default `App\Tools`). `snake_case` identifiers become
+   `StudlyCase` with an optional `Tool` suffix.
+
+All resolved classes must extend `Atlasphp\Atlas\Tools\Tool`.
+
+`provider_tools` can be declared as a bare string (`web_search`) or as
+an object with `type` and options (`{ type: web_search, max_results: 5 }`).
+Option keys are automatically translated from snake_case to camelCase
+constructor parameters.
 
 ## Lifecycle Model
 

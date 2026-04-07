@@ -11,24 +11,20 @@ declare(strict_types=1);
  * Mapping of tests to the F-tasks that will flip them:
  *
  *   - parallel/foreach           → F11 (parallel fan-out)
- *   - tools                      → F12 (tool invocation)
- *   - provider_tools             → F12 (provider tool invocation)
  *   - on_fail transition         → F10 (on_fail consumption)
  *   - defaults.timeout           → F9  (timeout enforcement)
  *   - defaults merge             → F8  (defaults merge at compile time)
+ *
+ * Flipped when the corresponding F-task shipped:
+ *
+ *   - tools, provider_tools      → F12 — see ToolResolverTest,
+ *     ProviderToolResolverTest, AtlasStepExecutorToolsTest.
  *
  * When the corresponding F-task lands, the test assertion gets rewritten
  * to assert the NEW (active) behavior. These are tripwires, not permanent
  * guarantees.
  */
 
-use Atlasphp\Atlas\Agent;
-use Atlasphp\Atlas\AgentRegistry;
-use Atlasphp\Atlas\Atlas;
-use Atlasphp\Atlas\Enums\Provider;
-use Atlasphp\Atlas\Requests\TextRequest;
-use Atlasphp\Atlas\Responses\Usage;
-use Atlasphp\Atlas\Testing\TextResponseFake;
 use Entrepeneur4lyf\LaravelConductor\Contracts\WorkflowStateStore;
 use Entrepeneur4lyf\LaravelConductor\Contracts\WorkflowStepExecutor;
 use Entrepeneur4lyf\LaravelConductor\Data\StepDefinitionData;
@@ -39,7 +35,6 @@ use Entrepeneur4lyf\LaravelConductor\Definitions\WorkflowCompiler;
 use Entrepeneur4lyf\LaravelConductor\Definitions\YamlWorkflowDefinitionRepository;
 use Entrepeneur4lyf\LaravelConductor\Engine\RunProcessor;
 use Entrepeneur4lyf\LaravelConductor\Engine\Supervisor;
-use Entrepeneur4lyf\LaravelConductor\Execution\AtlasStepExecutor;
 
 /**
  * Recording executor used to count invocations for the parallel/foreach
@@ -59,24 +54,6 @@ class InertFieldRecordingExecutor implements WorkflowStepExecutor
             'status' => 'completed',
             'payload' => ['headline' => 'recorded'],
         ]);
-    }
-}
-
-class InertFieldAgent extends Agent
-{
-    public function key(): string
-    {
-        return 'inert-field-agent';
-    }
-
-    public function provider(): Provider|string|null
-    {
-        return Provider::OpenAI;
-    }
-
-    public function model(): ?string
-    {
-        return 'gpt-4o-mini';
     }
 }
 
@@ -132,86 +109,6 @@ it('does not fan out parallel/foreach steps today (F11 tripwire)', function (): 
     // were active. Today the supervisor and run processor do not inspect
     // parallel/foreach at all, so exactly one execution happens.
     expect($executor->invocations)->toBe(1);
-});
-
-// ─── F12 tripwire: tools ────────────────────────────────────────────────
-
-it('does not invoke step-level tools through Atlas today (F12 tripwire)', function (): void {
-    // TODO(F12): when tool invocation lands, rewrite this test to
-    // assert that declaring `tools: ['stock_snapshot']` on a step
-    // causes the recorded Atlas TextRequest to carry the resolved
-    // Tool class in its $tools array (and that an unknown tool
-    // identifier causes the resolver to throw during execution).
-
-    app(AgentRegistry::class)->register(InertFieldAgent::class);
-
-    $fake = Atlas::fake([
-        TextResponseFake::make()->withText('ok')->withUsage(new Usage(1, 1)),
-    ]);
-
-    $executor = app(WorkflowStepExecutor::class);
-    expect($executor)->toBeInstanceOf(AtlasStepExecutor::class);
-
-    $input = StepInputData::from([
-        'step_id' => 'draft',
-        'run_id' => 'run-inert-tools',
-        'rendered_prompt' => 'Do something.',
-        'payload' => [],
-        'meta' => [
-            'tools' => ['nonexistent_tool_that_would_fail_if_resolved'],
-        ],
-    ]);
-
-    // Today, the executor silently ignores meta.tools. It does not
-    // try to resolve `nonexistent_tool_...`, so execute() returns
-    // normally without throwing.
-    $executor->execute('inert-field-agent', $input);
-
-    $recorded = $fake->recorded();
-
-    expect($recorded)->toHaveCount(1)
-        ->and($recorded[0]->request)->toBeInstanceOf(TextRequest::class)
-        // The tripwire: the recorded request's $tools array is empty
-        // because the executor never called ->withTools(...) despite
-        // meta.tools being populated. When F12 lands this assertion
-        // will fail and need to be flipped to assert presence.
-        ->and($recorded[0]->request->tools)->toBe([]);
-});
-
-// ─── F12 tripwire: provider_tools ───────────────────────────────────────
-
-it('does not invoke step-level provider_tools through Atlas today (F12 tripwire)', function (): void {
-    // TODO(F12): rewrite to assert that declaring
-    // `provider_tools: [{type: web_search, max_results: 5}]` causes the
-    // recorded TextRequest to carry a resolved WebSearch instance in
-    // its $providerTools array.
-
-    app(AgentRegistry::class)->register(InertFieldAgent::class);
-
-    $fake = Atlas::fake([
-        TextResponseFake::make()->withText('ok')->withUsage(new Usage(1, 1)),
-    ]);
-
-    $executor = app(WorkflowStepExecutor::class);
-
-    $input = StepInputData::from([
-        'step_id' => 'draft',
-        'run_id' => 'run-inert-provider-tools',
-        'rendered_prompt' => 'Do something.',
-        'payload' => [],
-        'meta' => [
-            'provider_tools' => [
-                ['type' => 'web_search', 'max_results' => 5],
-            ],
-        ],
-    ]);
-
-    $executor->execute('inert-field-agent', $input);
-
-    $recorded = $fake->recorded();
-
-    expect($recorded)->toHaveCount(1)
-        ->and($recorded[0]->request->providerTools)->toBe([]);
 });
 
 // ─── F10 tripwire: on_fail transition ───────────────────────────────────

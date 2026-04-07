@@ -103,8 +103,8 @@ These step fields are accepted by the loader and compiler:
 | `on_fail` | string | no | Validated and preserved, not consumed by runtime transitions today |
 | `condition` | string | no | Used by deterministic skip evaluation |
 | `quality_rules` | array | no | Used after schema validation |
-| `tools` | array | no | Preserved and forwarded in step metadata, not invoked by executor today |
-| `provider_tools` | array | no | Preserved and forwarded in step metadata, not invoked by executor today |
+| `tools` | array | no | Resolved at execution time via `ToolResolver` and passed to Atlas via `withTools()`. See the "Tools" section in `README.md` for the three resolution strategies. |
+| `provider_tools` | array | no | Resolved at execution time via `ProviderToolResolver` and passed to Atlas via `withProviderTools()`. Accepts bare strings (`web_search`) or objects with `type` and options. |
 | `meta` | array | no | Forwarded into step metadata for the executor |
 
 ## Failure Handler Fields
@@ -226,13 +226,13 @@ Based on the current code, the safest fields to rely on in production are:
 - `on_success`
 - `condition`
 - `quality_rules`
-- `failure_handlers` with `retry`, `retry_with_prompt`, `skip`, `wait`, or `fail`
+- `tools`
+- `provider_tools`
+- `failure_handlers` with `retry`, `retry_with_prompt`, `skip`, `wait`, or `fail` (with `delay` honored via persisted `retry_after` backoff)
 
 Treat these as accepted but not fully active runtime features for now:
 
-- `defaults`
-- `parallel`
-- `foreach`
-- `on_fail`
-- `tools`
-- `provider_tools`
+- `defaults` (preserved on the compiled snapshot but not merged into individual steps)
+- `parallel` / `foreach` (fan-out execution is a future milestone)
+- `on_fail` (not yet consumed as a transition target)
+- step-level `timeout` (validated but not enforced at execution time)
