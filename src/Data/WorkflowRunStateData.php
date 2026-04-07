@@ -21,6 +21,7 @@ final class WorkflowRunStateData extends Data
         public ?array $output = null,
         public array $context = [],
         public ?WaitStateData $wait = null,
+        public ?string $retry_after = null,
         /** @var array<int, StepExecutionStateData> */
         #[DataCollectionOf(StepExecutionStateData::class)]
         public array $steps = [],

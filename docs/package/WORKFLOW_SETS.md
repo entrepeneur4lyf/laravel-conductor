@@ -115,7 +115,7 @@ These fields are accepted by the loader and compiler:
 | --- | --- | --- | --- |
 | `match` | string | yes | Treated as a case-insensitive regular expression |
 | `action` | string | yes | See supported actions below |
-| `delay` | int | no | Returned in retry decisions, and used for wait timeout calculation |
+| `delay` | int | no | Enforced on `retry` actions via a persisted `retry_after` timestamp on the run dossier — subsequent `/continue` calls return a `noop` decision until the backoff elapses. Also used for `wait` timeout calculation. |
 | `prompt_template` | string | no | Required for `retry_with_prompt` |
 
 ## Supported Validation Rules

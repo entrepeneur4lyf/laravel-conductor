@@ -290,6 +290,10 @@ final class Supervisor
         $steps = $this->replaceLatestStep($run, $stepDefinition->id, $current);
         $steps[] = $retry;
 
+        $retryAfter = ($handler->delay ?? 0) > 0
+            ? \Carbon\CarbonImmutable::now('UTC')->addSeconds((int) $handler->delay)->toIso8601String()
+            : null;
+
         $stored = $this->persist(
             $run,
             status: 'running',
@@ -304,6 +308,7 @@ final class Supervisor
                 'Step retry scheduled.',
                 ['step_id' => $stepDefinition->id, 'attempt' => $retry->attempt, 'reason' => $error],
             ),
+            retryAfter: $retryAfter,
         );
 
         event(new StepRetrying($stored, $stepDefinition->id, $error));
@@ -655,6 +660,7 @@ final class Supervisor
         array $steps,
         ?WaitStateData $wait,
         array $timeline,
+        ?string $retryAfter = null,
     ): WorkflowRunStateData {
         return $this->stateStore->save(
             new WorkflowRunStateData(
@@ -669,6 +675,7 @@ final class Supervisor
                 output: $output,
                 context: $run->context,
                 wait: $wait,
+                retry_after: $retryAfter,
                 steps: $steps,
                 timeline: $timeline,
             ),

@@ -40,6 +40,26 @@ final class RunProcessor
                 throw new RunNotFoundException($runId);
             }
 
+            // Retry backoff short-circuit: if a prior failure-handler-driven
+            // retry scheduled a delay, honor it by returning noop until the
+            // backoff elapses. Layer 2 of the concurrency defense still runs
+            // on later invocations after the backoff clears.
+            if ($run->retry_after !== null) {
+                $retryAfter = \Carbon\CarbonImmutable::parse($run->retry_after);
+                if ($retryAfter->isFuture()) {
+                    return $this->buildResult(
+                        $run,
+                        new SupervisorDecisionData(
+                            action: 'noop',
+                            reason: sprintf(
+                                'Run is in retry backoff until %s.',
+                                $retryAfter->toIso8601String(),
+                            ),
+                        ),
+                    );
+                }
+            }
+
             if ($this->isTerminal($run)) {
                 return $this->buildResult(
                     $run,
@@ -240,6 +260,7 @@ final class RunProcessor
                 ...$run->toArray(),
                 'revision' => $run->revision + 1,
                 'status' => 'running',
+                'retry_after' => null,
                 'timeline' => array_map(
                     static fn ($entry) => $entry->toArray(),
                     Timeline::append(
@@ -275,6 +296,7 @@ final class RunProcessor
                 ...$run->toArray(),
                 'revision' => $run->revision + 1,
                 'status' => 'running',
+                'retry_after' => null,
                 'timeline' => array_map(
                     static fn ($entry) => $entry->toArray(),
                     Timeline::append(
@@ -312,6 +334,7 @@ final class RunProcessor
                 ...$run->toArray(),
                 'revision' => $run->revision + 1,
                 'status' => 'running',
+                'retry_after' => null,
                 'timeline' => array_map(
                     static fn ($entry) => $entry->toArray(),
                     Timeline::append(

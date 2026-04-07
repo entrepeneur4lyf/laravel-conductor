@@ -71,6 +71,7 @@ final class OptimisticRunMutator
             'input' => $state->input,
             'snapshot' => $state->snapshot->toArray(),
             'wait' => $state->wait?->toArray(),
+            'retry_after' => $state->retry_after,
             'output' => $state->output,
             'context' => $state->context,
             'timeline' => array_map(

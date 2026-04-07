@@ -31,6 +31,7 @@ Important fields:
 | `output` | object/array or null | Final output when available |
 | `context` | object/array | Stored context bag |
 | `wait` | object or null | Wait state with `resume_token` |
+| `retry_after` | string or null | ISO 8601 timestamp of the next earliest moment a failure-handler-driven retry will be honored. `null` outside of a backoff window. |
 | `steps` | array | Step execution history |
 | `timeline` | array | Timeline entries |
 
@@ -121,8 +122,9 @@ Request body:
 Behavior from code:
 
 1. load the run
-2. if terminal, return `noop`
-3. ask the supervisor whether the current state already implies a deterministic decision
+2. if `retry_after` is set and is in the future, return a `noop` decision with reason `Run is in retry backoff until {iso8601}.` — no executor call is made
+3. if terminal, return `noop`
+4. ask the supervisor whether the current state already implies a deterministic decision
 4. if not, build `StepInputData`
 5. persist the step as `running`
 6. execute the step through the bound `WorkflowStepExecutor`
@@ -367,7 +369,7 @@ These are important current-package facts that come directly from the code:
 - `/start` only initializes a run
 - `/continue` is the endpoint that actually executes a pending step
 - the current execution path is synchronous within the request
-- retries are appended to run state, but not automatically queued or delayed by the package today
+- retries are appended to run state synchronously (no background queue), but a failure handler `delay` is enforced via a persisted `retry_after` window on the run dossier — `/continue` returns a `noop` decision while the backoff is active
 - `state.driver` is configurable in config but only the database state store is bound today
 - every mutating run operation (`/continue`, `/resume`, `/retry`, `/cancel`) is wrapped in a `Cache::lock` keyed by the run id via `RunLockProvider`. The lock store, prefix, and TTL are configurable under `conductor.locks`. Requests that cannot acquire the lock get HTTP `423`.
 - run-level concurrency uses a three-layer defense: (1) the cache lock above, which is a cheap first-line rejection and is not load-bearing for correctness; (2) a pre-Atlas revision re-check inside `RunProcessor::continueRun` that catches TTL-expired races before any LLM tokens are spent and surfaces as HTTP `409`; (3) `OptimisticRunMutator`'s `WHERE revision = ?` predicate at the final write, which is the authoritative correctness gate. The default `CONDUCTOR_LOCK_TTL` is intentionally short (60 seconds) so stuck processes recover quickly — do not raise it to "exceed your slowest step", because the TTL is not what prevents concurrent Atlas calls.

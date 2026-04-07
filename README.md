@@ -24,6 +24,7 @@ Today, the package can:
 - execute the current pending step through Atlas structured output
 - resolve `context_map` values into prompt variables at runtime
 - escalate unmatched failures or explicit `action: escalate` handlers through an Atlas supervisor agent
+- enforce failure-handler `delay` values via a persisted `retry_after` window on the run
 - advance, retry, skip, wait, resume, fail, cancel, and complete runs through the HTTP lifecycle API
 - scaffold, validate, inspect, retry, and cancel runs through artisan commands
 
@@ -179,6 +180,7 @@ Current package behavior:
 4. Supervisor evaluation decides whether to advance, retry, wait, fail, cancel, complete, or noop.
 5. If the run is `waiting`, `POST /api/conductor/runs/{runId}/resume` completes that waiting step with external payload and re-enters supervisor evaluation.
 6. Failed steps with remaining retry budget can escalate through the registered Atlas supervisor agent when no handler matches or when a handler uses `action: escalate`.
+7. Failure handler `delay` values are enforced via a `retry_after` timestamp on the run dossier. `/continue` returns a `noop` decision while the backoff is active; the next state transition (or `/resume`, `/retry`, `/cancel`) clears it.
 
 The package is currently explicit and API-driven. Starting a run does not auto-execute the first step.
 

@@ -52,6 +52,7 @@ final class DatabaseWorkflowStateStore implements WorkflowStateStore
             'context' => $run->context ?? [],
             'snapshot' => $run->snapshot ?? [],
             'wait' => $run->wait,
+            'retry_after' => $run->retry_after?->toIso8601String(),
             'steps' => $run->stepRuns->map(static function (StepRun $stepRun): array {
                 return [
                     'step_definition_id' => $stepRun->step_definition_id,

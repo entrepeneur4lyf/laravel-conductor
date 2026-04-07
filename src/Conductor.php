@@ -81,6 +81,7 @@ final class Conductor
                     'revision' => $run->revision + 1,
                     'status' => 'running',
                     'wait' => null,
+                    'retry_after' => null,
                     'timeline' => array_map(
                         static fn ($entry) => $entry->toArray(),
                         Timeline::append(
@@ -159,6 +160,7 @@ final class Conductor
                     ...$run->toArray(),
                     'revision' => $run->revision + 1,
                     'status' => 'running',
+                    'retry_after' => null,
                     'timeline' => array_map(
                         static fn ($entry) => $entry->toArray(),
                         Timeline::append(
@@ -199,6 +201,7 @@ final class Conductor
                     'status' => 'cancelled',
                     'current_step_id' => null,
                     'wait' => null,
+                    'retry_after' => null,
                     'timeline' => array_map(
                         static fn ($entry) => $entry->toArray(),
                         Timeline::append(

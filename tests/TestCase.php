@@ -63,6 +63,7 @@ class TestCase extends Orchestra
             $table->json('input');
             $table->json('snapshot');
             $table->json('wait')->nullable();
+            $table->string('retry_after')->nullable();
             $table->json('output')->nullable();
             $table->json('context')->nullable();
             $table->json('timeline')->nullable();
