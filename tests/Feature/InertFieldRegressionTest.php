@@ -11,7 +11,6 @@ declare(strict_types=1);
  * Remaining tripwires and the F-task that will flip each:
  *
  *   - parallel/foreach           → F11 (parallel fan-out)
- *   - on_fail transition         → F10 (on_fail consumption)
  *   - step-level timeout         → F9  (per-step timeout enforcement)
  *
  * Flipped when the corresponding F-task shipped:
@@ -19,20 +18,19 @@ declare(strict_types=1);
  *   - tools, provider_tools      → F12 — see ToolResolverTest,
  *     ProviderToolResolverTest, AtlasStepExecutorToolsTest.
  *   - defaults merge             → F8  — see WorkflowDefaultsMergeTest.
+ *   - on_fail transition         → F10 — see OnFailTransitionTest.
  *
  * When the corresponding F-task lands, the test assertion gets rewritten
  * to assert the NEW (active) behavior. These are tripwires, not permanent
  * guarantees.
  */
 
-use Entrepeneur4lyf\LaravelConductor\Contracts\WorkflowStateStore;
 use Entrepeneur4lyf\LaravelConductor\Contracts\WorkflowStepExecutor;
 use Entrepeneur4lyf\LaravelConductor\Data\StepDefinitionData;
 use Entrepeneur4lyf\LaravelConductor\Data\StepExecutionStateData;
 use Entrepeneur4lyf\LaravelConductor\Data\StepInputData;
 use Entrepeneur4lyf\LaravelConductor\Data\StepOutputData;
 use Entrepeneur4lyf\LaravelConductor\Engine\RunProcessor;
-use Entrepeneur4lyf\LaravelConductor\Engine\Supervisor;
 
 /**
  * Recording executor used to count invocations for the parallel/foreach
@@ -109,63 +107,8 @@ it('does not fan out parallel/foreach steps today (F11 tripwire)', function (): 
     expect($executor->invocations)->toBe(1);
 });
 
-// ─── F10 tripwire: on_fail transition ───────────────────────────────────
-
-it('does not consume per-step on_fail as a transition target today (F10 tripwire)', function (): void {
-    // TODO(F10): when per-step on_fail consumption lands, rewrite this
-    // test to assert that a failed step with `on_fail: cleanup`
-    // transitions the run to the cleanup step after failure handlers
-    // and escalation are exhausted.
-
-    $stepWithOnFail = StepDefinitionData::from([
-        'id' => 'draft',
-        'agent' => 'writer',
-        'prompt_template' => 'prompts/draft.md.j2',
-        'prompt_template_contents' => 'Draft something.',
-        'retries' => 0,
-        'timeout' => 60,
-        'on_success' => 'complete',
-        'on_fail' => 'fail',
-    ]);
-
-    $run = storeRunState(
-        workflow: makeCompiledWorkflow(
-            steps: [$stepWithOnFail],
-            failureHandlers: [],
-        ),
-        steps: [
-            StepExecutionStateData::from([
-                'step_definition_id' => 'draft',
-                'status' => 'failed',
-                'attempt' => 1,
-                'error' => 'unhandled_error',
-            ]),
-        ],
-        overrides: [
-            'id' => 'run-inert-on-fail',
-            'status' => 'running',
-            'current_step_id' => 'draft',
-        ],
-    );
-
-    // Supervisor evaluation of a failed step with no matching handler and
-    // no retry budget remaining currently walks the fail path (because
-    // retries=0 and attempt=1 means the retry budget is already
-    // exhausted, and without an escalation match on_fail is also
-    // untouched).
-    $decision = app(Supervisor::class)->evaluate($run->id, 'draft');
-
-    // Today: the supervisor returns `fail` and the run ends up in the
-    // `failed` status. It never routes to the `on_fail` target.
-    expect($decision->action)->toBe('fail');
-
-    $stored = app(WorkflowStateStore::class)->get($run->id);
-    expect($stored)->not->toBeNull()
-        ->and($stored?->status)->toBe('failed');
-});
-
 // NOTE: The defaults-merge tripwires (F8 territory) were flipped to
 // active assertions when F8 landed. They now live in
-// WorkflowDefaultsMergeTest. The F9 tripwire (timeout *enforcement*
-// at execution time, distinct from compile-time defaults merging)
-// will be added when F9 lands.
+// WorkflowDefaultsMergeTest. The on_fail tripwire (F10) was also
+// flipped — see OnFailTransitionTest. The F9 tripwire (timeout
+// *enforcement* at execution time) will be added when F9 lands.

@@ -133,8 +133,9 @@ final class Supervisor
         string $decisionAction = 'advance',
         ?string $decisionReason = null,
         ?array $timeline = null,
+        ?string $targetOverride = null,
     ): SupervisorDecisionData {
-        $target = $stepDefinition->on_success;
+        $target = $targetOverride ?? $stepDefinition->on_success;
         $updatedSteps = $this->replaceLatestStep(
             $run,
             $stepDefinition->id,
@@ -244,22 +245,56 @@ final class Supervisor
         if ($handler === null) {
             return $canRetry
                 ? $this->escalate($run, $step, $stepDefinition, $error)
-                : $this->fail($run, $stepDefinition->id, $error);
+                : $this->failOrTransitionOnFail($run, $step, $stepDefinition, $error);
         }
 
         return match ($handler->action) {
             'retry' => $canRetry
                 ? $this->retry($run, $step, $stepDefinition, $error, $handler)
-                : $this->fail($run, $stepDefinition->id, $error),
+                : $this->failOrTransitionOnFail($run, $step, $stepDefinition, $error),
             'retry_with_prompt' => $canRetry
                 ? $this->retry($run, $step, $stepDefinition, $error, $handler, true)
-                : $this->fail($run, $stepDefinition->id, $error),
+                : $this->failOrTransitionOnFail($run, $step, $stepDefinition, $error),
             'escalate' => $this->escalate($run, $step, $stepDefinition, $error),
             'skip' => $this->skip($run, $step, $stepDefinition, $error),
             'wait' => $this->wait($run, $step, $stepDefinition, $handler->delay),
-            'fail' => $this->fail($run, $stepDefinition->id, $error),
-            default => $this->fail($run, $stepDefinition->id, $error),
+            'fail' => $this->failOrTransitionOnFail($run, $step, $stepDefinition, $error),
+            default => $this->failOrTransitionOnFail($run, $step, $stepDefinition, $error),
         };
+    }
+
+    /**
+     * Last-resort routing when failure handlers are exhausted (no match,
+     * or matched a non-routing action like `fail`, or escalation said
+     * `fail`). If the step declares an `on_fail` target, transition
+     * there as a fallback. Otherwise mark the run as failed.
+     */
+    private function failOrTransitionOnFail(
+        WorkflowRunStateData $run,
+        StepExecutionStateData $step,
+        StepDefinitionData $stepDefinition,
+        string $error,
+    ): SupervisorDecisionData {
+        $target = $stepDefinition->on_fail;
+
+        if ($target === null || $target === '') {
+            return $this->fail($run, $stepDefinition->id, $error);
+        }
+
+        return $this->advance(
+            $run,
+            $step,
+            $stepDefinition,
+            decisionAction: 'advance',
+            decisionReason: sprintf('Routed to on_fail target [%s] after [%s].', $target, $error),
+            timeline: Timeline::append(
+                $run->timeline,
+                'step_on_fail_routed',
+                sprintf('Step routed to on_fail target [%s].', $target),
+                ['step_id' => $stepDefinition->id, 'target' => $target, 'error' => $error],
+            ),
+            targetOverride: $target,
+        );
     }
 
     private function retry(
@@ -525,9 +560,9 @@ final class Supervisor
         return match ($decision->action) {
             'retry' => $step->attempt <= $stepDefinition->retries
                 ? $this->retryFromEscalation($run, $step, $stepDefinition, $decision)
-                : $this->fail($run, $stepDefinition->id, $decision->reason ?? $error),
+                : $this->failOrTransitionOnFail($run, $step, $stepDefinition, $decision->reason ?? $error),
             'skip' => $this->skip($run, $step, $stepDefinition, $decision->reason ?? $error),
-            default => $this->fail($run, $stepDefinition->id, $decision->reason ?? $error),
+            default => $this->failOrTransitionOnFail($run, $step, $stepDefinition, $decision->reason ?? $error),
         };
     }
 

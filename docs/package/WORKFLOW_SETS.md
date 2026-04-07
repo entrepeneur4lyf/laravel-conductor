@@ -144,7 +144,7 @@ These step fields are accepted by the loader and compiler:
 | `retries` | int | no | Used by retry budget logic |
 | `timeout` | int | no | Validated and preserved, not currently enforced as execution timeout |
 | `on_success` | string | no | Used by supervisor transitions |
-| `on_fail` | string | no | Validated and preserved, not consumed by runtime transitions today |
+| `on_fail` | string | no | Consumed by the supervisor as a fallback transition target after failure handlers and escalation are exhausted. May point at any known step or any terminal target (`complete`, `discard`, `fail`, `cancel`). |
 | `condition` | string | no | Used by deterministic skip evaluation |
 | `quality_rules` | array | no | Used after schema validation |
 | `tools` | array | no | Resolved at execution time via `ToolResolver` and passed to Atlas via `withTools()`. See the "Tools" section in `README.md` for the three resolution strategies. |
@@ -272,10 +272,10 @@ Based on the current code, the safest fields to rely on in production are:
 - `quality_rules`
 - `tools`
 - `provider_tools`
+- `on_fail` (consumed as a fallback transition after failure handlers and escalation are exhausted)
 - `failure_handlers` with `retry`, `retry_with_prompt`, `skip`, `wait`, or `fail` (with `delay` honored via persisted `retry_after` backoff)
 
 Treat these as accepted but not fully active runtime features for now:
 
 - `parallel` / `foreach` (fan-out execution is a future milestone)
-- `on_fail` (not yet consumed as a transition target)
 - step-level `timeout` (validated and inheritable from `defaults`, but not yet enforced at execution time)
