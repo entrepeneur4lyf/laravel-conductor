@@ -8,7 +8,7 @@ All notable changes to `entrepeneur4lyf/laravel-conductor` will be documented in
 
 ## [1.0.0] - 2026-04-07
 
-Phase A → D remediation shipped. Every advertised definition field is active except `parallel`/`foreach`, which is deferred to v2. Planning artifact for the remediation pass is archived at `docs/archive/REMEDIATION_PLAN.md`.
+Phase A → D remediation shipped. Every advertised definition field is active except `parallel`/`foreach`, which is deferred to v2.
 
 - per-step `timeout` is now enforced as a per-call HTTP deadline against the Atlas request via `Atlas\Pending\AgentRequest::withTimeout()`. The value is forwarded from `StepDefinitionData::$timeout` (or the merged `defaults.timeout` from F8) through `StepInputData::$meta` and applied inside `AtlasStepExecutor::execute()`. The timeout applies to the LLM round-trip only; in-process work in the same step is not bounded by this value (heartbeat or non-blocking I/O would be needed for that, which is out of scope). Non-positive timeouts are ignored.
 - per-step `on_fail` is now consumed by the supervisor as a fallback transition target after failure handlers and escalation are exhausted. Cascade order: matching failure handler runs first → escalation (if retry budget remains) → `on_fail` (if declared) → `fail`. The on_fail target may point at any known step or any of the terminal targets (`complete`, `discard`, `fail`, `cancel`). When a handler matches and resolves the failure (e.g. `skip`), the on_fail target is bypassed.

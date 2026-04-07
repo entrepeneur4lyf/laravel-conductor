@@ -887,7 +887,7 @@ F11 ships when:
 11. ✅ CHANGELOG entry describes the shipped surface honestly
 12. ✅ No new dependencies in `composer.json`
 
-The Phase A→D remediation plan is archived at `docs/archive/REMEDIATION_PLAN.md` — every task it tracked is shipped in v1. F11 is the v2 milestone.
+The Phase A→D remediation plan has been retired — every task it tracked is shipped in v1. F11 is the v2 milestone.
 
 ---
 
