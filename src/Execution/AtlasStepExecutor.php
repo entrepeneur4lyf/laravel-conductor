@@ -30,6 +30,15 @@ final class AtlasStepExecutor implements WorkflowStepExecutor
             ->withMeta($input->meta)
             ->message($input->rendered_prompt);
 
+        // ── Timeout ────────────────────────────────────
+        // Per-step timeout enforcement: forwarded to Atlas as a per-call
+        // HTTP deadline. Applies to the LLM round-trip only — in-process
+        // work in the same step is not bounded by this value.
+        $timeout = $this->stepTimeout($input);
+        if ($timeout !== null) {
+            $request->withTimeout($timeout);
+        }
+
         // ── Tools ──────────────────────────────────────
         $tools = $this->resolveTools($input);
         if ($tools !== []) {
@@ -100,6 +109,22 @@ final class AtlasStepExecutor implements WorkflowStepExecutor
         }
 
         return $schemaPath;
+    }
+
+    /**
+     * Resolve a positive per-call timeout from step meta. Returns null
+     * when no timeout is configured (Atlas falls back to its config
+     * default).
+     */
+    private function stepTimeout(StepInputData $input): ?int
+    {
+        $timeout = $input->meta['timeout'] ?? null;
+
+        if (! is_int($timeout) || $timeout <= 0) {
+            return null;
+        }
+
+        return $timeout;
     }
 
     private function schemaFromPath(string $schemaPath): Schema

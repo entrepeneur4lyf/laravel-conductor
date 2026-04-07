@@ -186,6 +186,7 @@ final class RunProcessor
                 ...$stepDefinition->meta,
                 'output_schema' => $stepDefinition->output_schema,
                 'output_schema_path' => $stepDefinition->output_schema_path,
+                'timeout' => $stepDefinition->timeout,
                 'tools' => $stepDefinition->tools,
                 'provider_tools' => $stepDefinition->provider_tools,
             ], static fn (mixed $value): bool => $value !== null),

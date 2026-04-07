@@ -142,7 +142,7 @@ These step fields are accepted by the loader and compiler:
 | `parallel` | bool | no | Validated, but not executed as parallel fan-out today |
 | `foreach` | string | no | Required when `parallel: true`, but not executed today |
 | `retries` | int | no | Used by retry budget logic |
-| `timeout` | int | no | Validated and preserved, not currently enforced as execution timeout |
+| `timeout` | int | no | Forwarded to Atlas as a per-call HTTP deadline via `withTimeout()`. Applies to the LLM round-trip only. May be inherited from `defaults.timeout`. |
 | `on_success` | string | no | Used by supervisor transitions |
 | `on_fail` | string | no | Consumed by the supervisor as a fallback transition target after failure handlers and escalation are exhausted. May point at any known step or any terminal target (`complete`, `discard`, `fail`, `cancel`). |
 | `condition` | string | no | Used by deterministic skip evaluation |
@@ -272,10 +272,10 @@ Based on the current code, the safest fields to rely on in production are:
 - `quality_rules`
 - `tools`
 - `provider_tools`
+- `timeout` (per-call Atlas HTTP deadline; inheritable from `defaults.timeout`)
 - `on_fail` (consumed as a fallback transition after failure handlers and escalation are exhausted)
 - `failure_handlers` with `retry`, `retry_with_prompt`, `skip`, `wait`, or `fail` (with `delay` honored via persisted `retry_after` backoff)
 
 Treat these as accepted but not fully active runtime features for now:
 
 - `parallel` / `foreach` (fan-out execution is a future milestone)
-- step-level `timeout` (validated and inheritable from `defaults`, but not yet enforced at execution time)
