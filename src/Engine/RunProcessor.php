@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Entrepeneur4lyf\LaravelConductor\Engine;
 
+use Carbon\CarbonImmutable;
 use Entrepeneur4lyf\LaravelConductor\Contracts\RunLockProvider;
 use Entrepeneur4lyf\LaravelConductor\Contracts\WorkflowStateStore;
 use Entrepeneur4lyf\LaravelConductor\Contracts\WorkflowStepExecutor;
@@ -45,7 +46,7 @@ final class RunProcessor
             // backoff elapses. Layer 2 of the concurrency defense still runs
             // on later invocations after the backoff clears.
             if ($run->retry_after !== null) {
-                $retryAfter = \Carbon\CarbonImmutable::parse($run->retry_after);
+                $retryAfter = CarbonImmutable::parse($run->retry_after);
                 if ($retryAfter->isFuture()) {
                     return $this->buildResult(
                         $run,

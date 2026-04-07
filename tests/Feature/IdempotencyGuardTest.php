@@ -64,7 +64,7 @@ function guardStep(
 // ─── forEvaluation ──────────────────────────────────────────────────────
 
 it('returns noop when the run is in a terminal status', function (string $terminal): void {
-    $guard = new IdempotencyGuard();
+    $guard = new IdempotencyGuard;
     $step = guardStep();
 
     $decision = $guard->forEvaluation(
@@ -79,7 +79,7 @@ it('returns noop when the run is in a terminal status', function (string $termin
 })->with(['completed', 'failed', 'cancelled']);
 
 it('returns noop when current_step_id no longer matches the target step', function (): void {
-    $guard = new IdempotencyGuard();
+    $guard = new IdempotencyGuard;
     $step = guardStep(stepId: 'approval');
 
     $decision = $guard->forEvaluation(
@@ -94,7 +94,7 @@ it('returns noop when current_step_id no longer matches the target step', functi
 });
 
 it('returns noop when the step execution state cannot be found', function (): void {
-    $guard = new IdempotencyGuard();
+    $guard = new IdempotencyGuard;
 
     $decision = $guard->forEvaluation(
         guardRun(steps: []),
@@ -108,7 +108,7 @@ it('returns noop when the step execution state cannot be found', function (): vo
 });
 
 it('returns noop when the step already has a supervisor_decision recorded', function (): void {
-    $guard = new IdempotencyGuard();
+    $guard = new IdempotencyGuard;
     $previousDecision = new SupervisorDecisionData(action: 'advance', reason: 'earlier');
     $step = guardStep(decision: $previousDecision);
 
@@ -124,7 +124,7 @@ it('returns noop when the step already has a supervisor_decision recorded', func
 });
 
 it('returns null (proceed) when the step is fresh and the guard has nothing to short-circuit', function (): void {
-    $guard = new IdempotencyGuard();
+    $guard = new IdempotencyGuard;
     $step = guardStep();
 
     $decision = $guard->forEvaluation(
@@ -139,7 +139,7 @@ it('returns null (proceed) when the step is fresh and the guard has nothing to s
 // ─── forRetryAttempt ────────────────────────────────────────────────────
 
 it('returns false from forRetryAttempt when the run is terminal', function (string $terminal): void {
-    $guard = new IdempotencyGuard();
+    $guard = new IdempotencyGuard;
     $step = guardStep(attempt: 2);
 
     $proceed = $guard->forRetryAttempt(
@@ -153,7 +153,7 @@ it('returns false from forRetryAttempt when the run is terminal', function (stri
 })->with(['completed', 'failed', 'cancelled']);
 
 it('returns false from forRetryAttempt when current_step_id has moved past the target step', function (): void {
-    $guard = new IdempotencyGuard();
+    $guard = new IdempotencyGuard;
     $step = guardStep(stepId: 'approval', attempt: 2);
 
     $proceed = $guard->forRetryAttempt(
@@ -167,7 +167,7 @@ it('returns false from forRetryAttempt when current_step_id has moved past the t
 });
 
 it('returns false from forRetryAttempt when the step is null', function (): void {
-    $guard = new IdempotencyGuard();
+    $guard = new IdempotencyGuard;
 
     $proceed = $guard->forRetryAttempt(
         guardRun(steps: []),
@@ -180,7 +180,7 @@ it('returns false from forRetryAttempt when the step is null', function (): void
 });
 
 it('returns false from forRetryAttempt when the step status is not pending', function (string $status): void {
-    $guard = new IdempotencyGuard();
+    $guard = new IdempotencyGuard;
     $step = guardStep(status: $status, attempt: 2);
 
     $proceed = $guard->forRetryAttempt(
@@ -194,7 +194,7 @@ it('returns false from forRetryAttempt when the step status is not pending', fun
 })->with(['running', 'completed', 'failed', 'skipped', 'retrying']);
 
 it('returns false from forRetryAttempt when the attempt number has changed', function (): void {
-    $guard = new IdempotencyGuard();
+    $guard = new IdempotencyGuard;
     $step = guardStep(attempt: 3);
 
     $proceed = $guard->forRetryAttempt(
@@ -208,7 +208,7 @@ it('returns false from forRetryAttempt when the attempt number has changed', fun
 });
 
 it('returns true from forRetryAttempt when the step is pending on the expected attempt', function (): void {
-    $guard = new IdempotencyGuard();
+    $guard = new IdempotencyGuard;
     $step = guardStep(attempt: 2);
 
     $proceed = $guard->forRetryAttempt(

@@ -199,7 +199,7 @@ it('it wraps continueRun in a lock', function (): void {
             ->withUsage(new Usage(3, 4)),
     ]);
 
-    $recorder = new RecordingRunLockProvider();
+    $recorder = new RecordingRunLockProvider;
     $this->app->instance(RunLockProvider::class, $recorder);
 
     // Re-bind RunProcessor so it picks up the freshly bound lock provider.
@@ -249,7 +249,7 @@ it('it returns 423 when /continue cannot acquire the lock', function (): void {
 
     // Swap in a throwing lock provider AFTER start so the start path
     // (which does not lock) still succeeds normally.
-    $thrower = new ThrowingRunLockProvider();
+    $thrower = new ThrowingRunLockProvider;
     $this->app->instance(RunLockProvider::class, $thrower);
     $this->app->forgetInstance(RunProcessor::class);
 
@@ -281,10 +281,10 @@ it('it does not call the executor when the lock cannot be acquired', function ()
 
     $runId = (string) $started->json('data.id');
 
-    $executor = new RecordingWorkflowStepExecutor();
+    $executor = new RecordingWorkflowStepExecutor;
     $this->app->instance(WorkflowStepExecutor::class, $executor);
 
-    $thrower = new ThrowingRunLockProvider();
+    $thrower = new ThrowingRunLockProvider;
     $this->app->instance(RunLockProvider::class, $thrower);
     $this->app->forgetInstance(RunProcessor::class);
 
@@ -334,7 +334,7 @@ it('it rejects continueRun with 409 when the run revision advances between the l
     $this->app->forgetInstance(Supervisor::class);
 
     // Bind a recording executor so we can assert it is never reached.
-    $executor = new RecordingWorkflowStepExecutor();
+    $executor = new RecordingWorkflowStepExecutor;
     $this->app->instance(WorkflowStepExecutor::class, $executor);
 
     $response = $this->postJson("/api/conductor/runs/{$runId}/continue");

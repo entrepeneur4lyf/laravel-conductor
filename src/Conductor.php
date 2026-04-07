@@ -32,8 +32,7 @@ final class Conductor
         private readonly WorkflowStateStore $stateStore,
         private readonly Supervisor $supervisor,
         private readonly RunLockProvider $lockProvider,
-    ) {
-    }
+    ) {}
 
     /**
      * @param  array<string, mixed>  $input

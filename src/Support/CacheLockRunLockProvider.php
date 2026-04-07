@@ -16,8 +16,7 @@ final class CacheLockRunLockProvider implements RunLockProvider
 {
     public function __construct(
         private readonly CacheFactory $cache,
-    ) {
-    }
+    ) {}
 
     public function withLock(string $runId, Closure $callback, int $blockSeconds = 5): mixed
     {

@@ -61,7 +61,7 @@ it('it wraps resumeRun in a lock', function (): void {
         ],
     );
 
-    $recorder = new ResumeRetryRecordingLock();
+    $recorder = new ResumeRetryRecordingLock;
     $this->app->instance(RunLockProvider::class, $recorder);
     $this->app->forgetInstance(Conductor::class);
 
@@ -99,7 +99,7 @@ it('it returns 423 from /resume when lock fails', function (): void {
         ],
     );
 
-    $thrower = new ResumeRetryThrowingLock();
+    $thrower = new ResumeRetryThrowingLock;
     $this->app->instance(RunLockProvider::class, $thrower);
     $this->app->forgetInstance(Conductor::class);
 
@@ -129,7 +129,7 @@ it('it wraps retryRun in a lock', function (): void {
         ],
     );
 
-    $recorder = new ResumeRetryRecordingLock();
+    $recorder = new ResumeRetryRecordingLock;
     $this->app->instance(RunLockProvider::class, $recorder);
     $this->app->forgetInstance(Conductor::class);
 
@@ -157,7 +157,7 @@ it('it returns 423 from /retry when lock fails', function (): void {
         ],
     );
 
-    $thrower = new ResumeRetryThrowingLock();
+    $thrower = new ResumeRetryThrowingLock;
     $this->app->instance(RunLockProvider::class, $thrower);
     $this->app->forgetInstance(Conductor::class);
 
@@ -178,7 +178,7 @@ it('it wraps cancelRun in a lock', function (): void {
         ],
     );
 
-    $recorder = new ResumeRetryRecordingLock();
+    $recorder = new ResumeRetryRecordingLock;
     $this->app->instance(RunLockProvider::class, $recorder);
     $this->app->forgetInstance(Conductor::class);
 
@@ -198,7 +198,7 @@ it('it returns 423 from /cancel when lock fails', function (): void {
         ],
     );
 
-    $thrower = new ResumeRetryThrowingLock();
+    $thrower = new ResumeRetryThrowingLock;
     $this->app->instance(RunLockProvider::class, $thrower);
     $this->app->forgetInstance(Conductor::class);
 

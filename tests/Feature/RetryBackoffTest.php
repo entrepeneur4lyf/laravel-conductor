@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Atlasphp\Atlas\AgentRegistry;
 use Atlasphp\Atlas\Atlas;
+use Atlasphp\Atlas\Testing\TextResponseFake;
 use Carbon\CarbonImmutable;
 use Entrepeneur4lyf\LaravelConductor\Contracts\WorkflowStateStore;
 use Entrepeneur4lyf\LaravelConductor\Contracts\WorkflowStepExecutor;
@@ -169,7 +170,7 @@ it('does not call the executor while retry_after is in the future', function ():
         ],
     );
 
-    $executor = new RetryBackoffRecordingExecutor();
+    $executor = new RetryBackoffRecordingExecutor;
     $this->app->instance(WorkflowStepExecutor::class, $executor);
     $this->app->forgetInstance(RunProcessor::class);
 
@@ -205,7 +206,7 @@ it('allows /continue once retry_after has elapsed', function (): void {
         ],
     );
 
-    $executor = new RetryBackoffRecordingExecutor();
+    $executor = new RetryBackoffRecordingExecutor;
     $this->app->instance(WorkflowStepExecutor::class, $executor);
     $this->app->forgetInstance(RunProcessor::class);
 
@@ -242,7 +243,7 @@ it('clears retry_after when a successful step execution advances the run', funct
         ],
     );
 
-    $executor = new RetryBackoffRecordingExecutor();
+    $executor = new RetryBackoffRecordingExecutor;
     $this->app->instance(WorkflowStepExecutor::class, $executor);
     $this->app->forgetInstance(RunProcessor::class);
 
@@ -293,10 +294,10 @@ it('clears retry_after when the run is cancelled', function (): void {
 });
 
 it('does not set retry_after on escalation-driven retries', function (): void {
-    app(AgentRegistry::class)->register(\SupervisorEscalationTestAgent::class);
+    app(AgentRegistry::class)->register(SupervisorEscalationTestAgent::class);
 
     Atlas::fake([
-        \Atlasphp\Atlas\Testing\TextResponseFake::make()->withText(json_encode([
+        TextResponseFake::make()->withText(json_encode([
             'action' => 'retry',
             'reason' => 'AI escalation requested retry.',
             'modified_prompt' => 'Try again with a sharper prompt.',

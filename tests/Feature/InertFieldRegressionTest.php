@@ -35,8 +35,9 @@ use Entrepeneur4lyf\LaravelConductor\Data\StepDefinitionData;
 use Entrepeneur4lyf\LaravelConductor\Data\StepExecutionStateData;
 use Entrepeneur4lyf\LaravelConductor\Data\StepInputData;
 use Entrepeneur4lyf\LaravelConductor\Data\StepOutputData;
-use Entrepeneur4lyf\LaravelConductor\Definitions\YamlWorkflowDefinitionRepository;
 use Entrepeneur4lyf\LaravelConductor\Definitions\WorkflowCompiler;
+use Entrepeneur4lyf\LaravelConductor\Definitions\YamlWorkflowDefinitionRepository;
+use Entrepeneur4lyf\LaravelConductor\Engine\RunProcessor;
 use Entrepeneur4lyf\LaravelConductor\Engine\Supervisor;
 use Entrepeneur4lyf\LaravelConductor\Execution\AtlasStepExecutor;
 
@@ -121,9 +122,9 @@ it('does not fan out parallel/foreach steps today (F11 tripwire)', function (): 
         ],
     );
 
-    $executor = new InertFieldRecordingExecutor();
+    $executor = new InertFieldRecordingExecutor;
     $this->app->instance(WorkflowStepExecutor::class, $executor);
-    $this->app->forgetInstance(\Entrepeneur4lyf\LaravelConductor\Engine\RunProcessor::class);
+    $this->app->forgetInstance(RunProcessor::class);
 
     $this->postJson("/api/conductor/runs/{$run->id}/continue")->assertOk();
 

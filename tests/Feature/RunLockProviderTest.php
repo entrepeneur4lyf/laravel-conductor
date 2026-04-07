@@ -136,7 +136,7 @@ it('maps LockTimeoutException to RunLockedException', function (): void {
     $lock = Mockery::mock(Lock::class);
     $lock->shouldReceive('block')
         ->once()
-        ->andThrow(new LockTimeoutException());
+        ->andThrow(new LockTimeoutException);
 
     $repository = Mockery::mock(CacheRepository::class, LockProvider::class);
     $repository->shouldReceive('lock')

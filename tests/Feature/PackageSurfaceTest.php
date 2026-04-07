@@ -2,6 +2,9 @@
 
 declare(strict_types=1);
 
+use Entrepeneur4lyf\LaravelConductor\Conductor;
+use Entrepeneur4lyf\LaravelConductor\Contracts\RunLockProvider;
+use Entrepeneur4lyf\LaravelConductor\Contracts\WorkflowStateStore;
 use Entrepeneur4lyf\LaravelConductor\Data\CompiledWorkflowData;
 use Entrepeneur4lyf\LaravelConductor\Data\FailureHandlerData;
 use Entrepeneur4lyf\LaravelConductor\Data\StepDefinitionData;
@@ -9,11 +12,6 @@ use Entrepeneur4lyf\LaravelConductor\Data\StepExecutionStateData;
 use Entrepeneur4lyf\LaravelConductor\Data\SupervisorDecisionData;
 use Entrepeneur4lyf\LaravelConductor\Data\WorkflowRunResultData;
 use Entrepeneur4lyf\LaravelConductor\Data\WorkflowRunStateData;
-use Entrepeneur4lyf\LaravelConductor\Facades\Conductor as ConductorFacade;
-use Entrepeneur4lyf\LaravelConductor\Contracts\RunLockProvider;
-use Entrepeneur4lyf\LaravelConductor\Conductor;
-use Entrepeneur4lyf\LaravelConductor\Support\CacheLockRunLockProvider;
-use Entrepeneur4lyf\LaravelConductor\Support\NullRunLockProvider;
 use Entrepeneur4lyf\LaravelConductor\Engine\Supervisor;
 use Entrepeneur4lyf\LaravelConductor\Engine\WorkflowEngine;
 use Entrepeneur4lyf\LaravelConductor\Events\RunWaiting;
@@ -22,6 +20,9 @@ use Entrepeneur4lyf\LaravelConductor\Events\WorkflowCancelled;
 use Entrepeneur4lyf\LaravelConductor\Events\WorkflowCompleted;
 use Entrepeneur4lyf\LaravelConductor\Events\WorkflowFailed;
 use Entrepeneur4lyf\LaravelConductor\Events\WorkflowStarted;
+use Entrepeneur4lyf\LaravelConductor\Facades\Conductor as ConductorFacade;
+use Entrepeneur4lyf\LaravelConductor\Support\CacheLockRunLockProvider;
+use Entrepeneur4lyf\LaravelConductor\Support\NullRunLockProvider;
 use Illuminate\Support\Facades\Event;
 
 it('registers the conductor artisan commands', function (): void {
@@ -215,7 +216,7 @@ it('falls back to CacheLockRunLockProvider when the test override is removed', f
     $this->app->forgetInstance(RunLockProvider::class);
     $this->app->bind(
         RunLockProvider::class,
-        \Entrepeneur4lyf\LaravelConductor\Support\CacheLockRunLockProvider::class,
+        CacheLockRunLockProvider::class,
     );
 
     expect(app(RunLockProvider::class))->toBeInstanceOf(CacheLockRunLockProvider::class);
@@ -299,7 +300,7 @@ function storeLifecycleRun(
         'timeline' => [],
     ], $overrides));
 
-    return app(\Entrepeneur4lyf\LaravelConductor\Contracts\WorkflowStateStore::class)->store($state);
+    return app(WorkflowStateStore::class)->store($state);
 }
 
 function makeLifecycleWorkflow(array $steps = [], array $failureHandlers = []): CompiledWorkflowData

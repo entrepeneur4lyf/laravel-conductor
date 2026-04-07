@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Entrepeneur4lyf\LaravelConductor\Engine;
 
+use Carbon\CarbonImmutable;
 use Entrepeneur4lyf\LaravelConductor\Contracts\WorkflowStateStore;
 use Entrepeneur4lyf\LaravelConductor\Data\CompiledWorkflowData;
 use Entrepeneur4lyf\LaravelConductor\Data\FailureHandlerData;
@@ -291,7 +292,7 @@ final class Supervisor
         $steps[] = $retry;
 
         $retryAfter = ($handler->delay ?? 0) > 0
-            ? \Carbon\CarbonImmutable::now('UTC')->addSeconds((int) $handler->delay)->toIso8601String()
+            ? CarbonImmutable::now('UTC')->addSeconds((int) $handler->delay)->toIso8601String()
             : null;
 
         $stored = $this->persist(

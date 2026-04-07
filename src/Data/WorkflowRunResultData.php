@@ -11,6 +11,5 @@ final class WorkflowRunResultData extends Data
     public function __construct(
         public WorkflowRunStateData $run,
         public SupervisorDecisionData $decision,
-    ) {
-    }
+    ) {}
 }
