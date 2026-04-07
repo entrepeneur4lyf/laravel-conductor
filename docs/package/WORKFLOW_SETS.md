@@ -81,7 +81,51 @@ These fields are loaded into `WorkflowDefinitionData` today:
 | `steps` | array | yes | Must contain at least one step |
 | `description` | string | no | Preserved on the compiled snapshot |
 | `failure_handlers` | array | no | Defaults to `[]` |
-| `defaults` | object/array | no | Preserved on the compiled snapshot |
+| `defaults` | object/array | no | Merged into each step at load time. See the "Defaults" section below. |
+
+## Defaults
+
+The workflow root may declare a `defaults` block. At load time, each
+key in the defaults block is propagated into every step that does NOT
+explicitly declare the same field. This lets you avoid repeating
+common values like `retries` or `timeout` across many steps.
+
+Merge-eligible keys (everything else is rejected):
+
+- `retries`
+- `timeout`
+- `tools`
+- `provider_tools`
+- `meta`
+
+Semantics:
+
+- A step value always wins over a defaults value (`array_key_exists`
+  on the raw payload, so explicit `0` or `[]` are preserved).
+- Arrays are **replaced**, not deep-merged. If a step declares
+  `tools: [foo]` and defaults declares `tools: [bar, baz]`, the
+  resulting step has `tools: [foo]` only.
+- Step-identity fields (`id`, `agent`, `prompt_template`,
+  `output_schema`) are rejected from the defaults block at load
+  time. Putting them there raises an `InvalidArgumentException`.
+
+```yaml
+name: example
+defaults:
+  retries: 3
+  timeout: 90
+  tools:
+    - shared_tool
+steps:
+  - id: research
+    agent: research-agent
+    # inherits retries: 3, timeout: 90, tools: [shared_tool]
+  - id: review
+    agent: review-agent
+    retries: 0          # explicit — overrides default
+    tools:
+      - reviewer_tool   # replaces the defaults list entirely
+```
 
 ## Step Fields
 
@@ -232,7 +276,6 @@ Based on the current code, the safest fields to rely on in production are:
 
 Treat these as accepted but not fully active runtime features for now:
 
-- `defaults` (preserved on the compiled snapshot but not merged into individual steps)
 - `parallel` / `foreach` (fan-out execution is a future milestone)
 - `on_fail` (not yet consumed as a transition target)
-- step-level `timeout` (validated but not enforced at execution time)
+- step-level `timeout` (validated and inheritable from `defaults`, but not yet enforced at execution time)

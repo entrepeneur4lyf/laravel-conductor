@@ -8,17 +8,17 @@ declare(strict_types=1);
  * test pins the *current* inert behavior so a silent semantic change
  * during a future F-task implementation is caught loudly.
  *
- * Mapping of tests to the F-tasks that will flip them:
+ * Remaining tripwires and the F-task that will flip each:
  *
  *   - parallel/foreach           → F11 (parallel fan-out)
  *   - on_fail transition         → F10 (on_fail consumption)
- *   - defaults.timeout           → F9  (timeout enforcement)
- *   - defaults merge             → F8  (defaults merge at compile time)
+ *   - step-level timeout         → F9  (per-step timeout enforcement)
  *
  * Flipped when the corresponding F-task shipped:
  *
  *   - tools, provider_tools      → F12 — see ToolResolverTest,
  *     ProviderToolResolverTest, AtlasStepExecutorToolsTest.
+ *   - defaults merge             → F8  — see WorkflowDefaultsMergeTest.
  *
  * When the corresponding F-task lands, the test assertion gets rewritten
  * to assert the NEW (active) behavior. These are tripwires, not permanent
@@ -31,8 +31,6 @@ use Entrepeneur4lyf\LaravelConductor\Data\StepDefinitionData;
 use Entrepeneur4lyf\LaravelConductor\Data\StepExecutionStateData;
 use Entrepeneur4lyf\LaravelConductor\Data\StepInputData;
 use Entrepeneur4lyf\LaravelConductor\Data\StepOutputData;
-use Entrepeneur4lyf\LaravelConductor\Definitions\WorkflowCompiler;
-use Entrepeneur4lyf\LaravelConductor\Definitions\YamlWorkflowDefinitionRepository;
 use Entrepeneur4lyf\LaravelConductor\Engine\RunProcessor;
 use Entrepeneur4lyf\LaravelConductor\Engine\Supervisor;
 
@@ -166,73 +164,8 @@ it('does not consume per-step on_fail as a transition target today (F10 tripwire
         ->and($stored?->status)->toBe('failed');
 });
 
-// ─── F9 tripwire: defaults.timeout ──────────────────────────────────────
-
-function writeInertTripwireWorkflow(string $yaml): string
-{
-    $directory = sys_get_temp_dir().DIRECTORY_SEPARATOR.'conductor-inert-'.bin2hex(random_bytes(5));
-    mkdir($directory, 0777, true);
-    file_put_contents($directory.DIRECTORY_SEPARATOR.'tripwire.yaml', $yaml);
-    config()->set('conductor.definitions.paths', [$directory]);
-
-    return $directory;
-}
-
-it('does not enforce defaults.timeout at compile time today (F9 tripwire)', function (): void {
-    // TODO(F9): when timeout enforcement lands (after F8 makes
-    // defaults.timeout merge into individual steps), rewrite this test
-    // to assert that a step without an explicit timeout inherits the
-    // defaults value and that an exceeded timeout surfaces as a failed
-    // step.
-
-    writeInertTripwireWorkflow(<<<'YAML'
-name: inert-tripwire
-version: 1
-description: Defaults tripwire
-defaults:
-  timeout: 30
-steps:
-  - id: draft
-    agent: writer
-    on_success: complete
-YAML);
-
-    $loaded = app(YamlWorkflowDefinitionRepository::class)->load('tripwire');
-    $compiled = app(WorkflowCompiler::class)->compile($loaded);
-
-    // Today, the compiled step's timeout is the DTO default (120s),
-    // NOT the 30s declared in the defaults block. The defaults block
-    // round-trips unchanged onto the compiled snapshot but is never
-    // merged into the individual steps.
-    expect($compiled->steps[0]->timeout)->toBe(120)
-        ->and($compiled->defaults)->toHaveKey('timeout')
-        ->and($compiled->defaults['timeout'])->toBe(30);
-});
-
-// ─── F8 tripwire: defaults merge ────────────────────────────────────────
-
-it('does not merge defaults.retries into individual step compilation today (F8 tripwire)', function (): void {
-    // TODO(F8): when defaults merge lands in WorkflowCompiler::compileStep,
-    // rewrite this test to assert that a step without explicit retries
-    // inherits the defaults value (expected: $compiled->steps[0]->retries === 5).
-
-    writeInertTripwireWorkflow(<<<'YAML'
-name: inert-tripwire
-version: 1
-description: Defaults retries tripwire
-defaults:
-  retries: 5
-steps:
-  - id: draft
-    agent: writer
-    on_success: complete
-YAML);
-
-    $loaded = app(YamlWorkflowDefinitionRepository::class)->load('tripwire');
-    $compiled = app(WorkflowCompiler::class)->compile($loaded);
-
-    // Today: compiled step inherits the DTO default of 0, not 5.
-    expect($compiled->steps[0]->retries)->toBe(0)
-        ->and($compiled->defaults)->toHaveKey('retries')
-        ->and($compiled->defaults['retries'])->toBe(5);
-});
+// NOTE: The defaults-merge tripwires (F8 territory) were flipped to
+// active assertions when F8 landed. They now live in
+// WorkflowDefaultsMergeTest. The F9 tripwire (timeout *enforcement*
+// at execution time, distinct from compile-time defaults merging)
+// will be added when F9 lands.

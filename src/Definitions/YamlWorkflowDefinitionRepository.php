@@ -12,6 +12,20 @@ use Symfony\Component\Yaml\Yaml;
 
 final class YamlWorkflowDefinitionRepository implements DefinitionRepository
 {
+    /**
+     * Keys on the root `defaults` block that may be propagated into
+     * individual steps when the step does not declare them explicitly.
+     * Any key not in this list is rejected at load time so hosts do not
+     * accidentally override step identity fields via defaults.
+     */
+    private const MERGE_ELIGIBLE_DEFAULTS = [
+        'retries',
+        'timeout',
+        'tools',
+        'provider_tools',
+        'meta',
+    ];
+
     public function __construct(
         private readonly ConfigRepository $config,
     ) {}
@@ -37,10 +51,70 @@ final class YamlWorkflowDefinitionRepository implements DefinitionRepository
             ));
         }
 
+        $payload = $this->applyDefaults($payload, $sourcePath);
+
         return new LoadedWorkflowDefinition(
             definition: WorkflowDefinitionData::from($payload),
             sourcePath: $sourcePath,
         );
+    }
+
+    /**
+     * Merge the workflow root `defaults` block into each step that does
+     * not declare the same field explicitly. Identity fields on the step
+     * (id, agent, prompt_template, output_schema) are NOT merge-eligible
+     * and are rejected from the defaults block with a clear error so the
+     * failure mode is "loud invalid configuration" rather than "silent
+     * identity collision." Merges operate at the raw array level so the
+     * distinction between "explicitly set" and "using the DTO default"
+     * is preserved.
+     *
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private function applyDefaults(array $payload, string $sourcePath): array
+    {
+        $defaults = $payload['defaults'] ?? [];
+
+        if (! is_array($defaults) || $defaults === []) {
+            return $payload;
+        }
+
+        $invalidKeys = array_diff(array_keys($defaults), self::MERGE_ELIGIBLE_DEFAULTS);
+
+        if ($invalidKeys !== []) {
+            throw new \InvalidArgumentException(sprintf(
+                'Workflow definition [%s] declares unsupported keys in defaults: [%s]. '
+                .'Allowed keys: [%s]. Step-identity fields (id, agent, prompt_template, '
+                .'output_schema) cannot be set via defaults.',
+                $sourcePath,
+                implode(', ', $invalidKeys),
+                implode(', ', self::MERGE_ELIGIBLE_DEFAULTS),
+            ));
+        }
+
+        if (! isset($payload['steps']) || ! is_array($payload['steps'])) {
+            return $payload;
+        }
+
+        $payload['steps'] = array_map(
+            function ($step) use ($defaults): mixed {
+                if (! is_array($step)) {
+                    return $step;
+                }
+
+                foreach ($defaults as $key => $value) {
+                    if (! array_key_exists($key, $step)) {
+                        $step[$key] = $value;
+                    }
+                }
+
+                return $step;
+            },
+            $payload['steps'],
+        );
+
+        return $payload;
     }
 
     public function resolvePath(string $workflow): string
