@@ -17,7 +17,7 @@
     ],
     "require": {
         "atlas-php/atlas": "^3.0",
-        "illuminate/contracts": "^13.0",
+        "illuminate/contracts": "^12.0 || ^13.0",
         "justinrainbow/json-schema": "^5.3",
         "php": "^8.3",
         "spatie/laravel-data": "^4.21",

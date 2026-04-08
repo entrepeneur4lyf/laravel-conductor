@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 `entrepeneur4lyf/laravel-conductor` is an Atlas-native workflow orchestration package for Laravel 13. It is a *package*, not an application — it ships a service provider, migrations, routes, artisan commands, and a `Conductor` facade for host applications to consume.
 
-Stack: PHP `^8.3`, Laravel `^13.0`, `atlas-php/atlas` `^3.0`, `spatie/laravel-data`, `twig/twig`, `justinrainbow/json-schema`, `symfony/yaml`. Tested via `pestphp/pest` `^4.0` on `orchestra/testbench` `^11`.
+Stack: PHP `^8.3`, Laravel `^12.0 || ^13.0`, `atlas-php/atlas` `^3.0`, `spatie/laravel-data`, `twig/twig`, `justinrainbow/json-schema`, `symfony/yaml`. Tested via `pestphp/pest` `^4.0` on `orchestra/testbench` `^10` (Laravel 12) or `^11` (Laravel 13).
 
 ## Commands
 
