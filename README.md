@@ -2,6 +2,8 @@
 
 `entrepeneur4lyf/laravel-conductor` is an Atlas-native workflow orchestration package for Laravel 13.
 
+> **Status — not yet on Packagist.** The package is fully functional and its test suite is green, but it is **not** published to Packagist yet. An example application that exercises the package end-to-end (workflow definition → execution → resume/retry/cancel lifecycle) is being built alongside it, and Packagist publishing is intentionally on hold until that demo app proves the package works in a realistic host application. Until then, depend on it via a VCS repository in your `composer.json` if you want to try it, and expect the public API to change without semver notice.
+
 It is built for declarative multi-step workflows where:
 
 - workflow definitions live in YAML or JSON
