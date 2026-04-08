@@ -35,7 +35,7 @@ Today, the package can:
 Important so nobody gets surprised:
 
 - it does not auto-dispatch the first step when you call `start`
-- it does not currently queue step execution in the background
+- step execution is synchronous (no background queue), though failure-handler retry delays are enforced in-process via `retry_after` — early `/continue` calls short-circuit to a `noop` decision until the deadline passes
 - it does not currently implement parallel fan-out execution from `parallel` and `foreach`
 
 Only the parallel/foreach fan-out remains as a future feature; everything else in the definition model is now active. `tools` and `provider_tools` are resolved and forwarded to Atlas at execution time — see the "Tools" section below. `on_fail` is consumed as a fallback transition after failure handlers and escalation are exhausted. Per-step `timeout` is forwarded to Atlas as a per-call HTTP deadline. Workflow `defaults` are merged into individual steps at load time.
