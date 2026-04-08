@@ -23,6 +23,7 @@ return new class extends Migration
             $table->text('prompt_override')->nullable();
             $table->json('supervisor_decision')->nullable();
             $table->text('supervisor_feedback')->nullable();
+            $table->timestampTz('completed_at')->nullable();
             $table->timestamps();
 
             $table->foreign('pipeline_run_id')

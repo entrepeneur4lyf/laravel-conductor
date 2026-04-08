@@ -102,6 +102,7 @@ final class OptimisticRunMutator
                     'prompt_override' => $step->prompt_override,
                     'supervisor_decision' => $step->supervisor_decision?->toArray(),
                     'supervisor_feedback' => $step->supervisor_feedback,
+                    'completed_at' => $step->completed_at,
                 ],
             );
         }

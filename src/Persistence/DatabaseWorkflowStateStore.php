@@ -65,6 +65,7 @@ final class DatabaseWorkflowStateStore implements WorkflowStateStore
                     'prompt_override' => $stepRun->prompt_override,
                     'supervisor_decision' => $stepRun->supervisor_decision,
                     'supervisor_feedback' => $stepRun->supervisor_feedback,
+                    'completed_at' => $stepRun->completed_at?->toIso8601String(),
                 ];
             })->all(),
             'timeline' => $run->timeline ?? [],

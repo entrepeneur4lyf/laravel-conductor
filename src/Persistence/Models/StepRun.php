@@ -7,6 +7,7 @@ namespace Entrepeneur4lyf\LaravelConductor\Persistence\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
@@ -21,6 +22,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string|null $prompt_override
  * @property array<string, mixed>|null $supervisor_decision
  * @property string|null $supervisor_feedback
+ * @property Carbon|null $completed_at
  */
 final class StepRun extends Model
 {
@@ -39,6 +41,7 @@ final class StepRun extends Model
             'input' => 'array',
             'output' => 'array',
             'supervisor_decision' => 'array',
+            'completed_at' => 'datetime',
         ];
     }
 

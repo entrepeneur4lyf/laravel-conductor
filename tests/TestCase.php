@@ -63,7 +63,10 @@ class TestCase extends Orchestra
             $table->json('input');
             $table->json('snapshot');
             $table->json('wait')->nullable();
-            $table->string('retry_after')->nullable();
+            // SQLite has no native timestamptz, but `timestamp` matches the
+            // production migration's column intent closely enough for tests
+            // (Carbon parses ISO 8601 strings on read either way).
+            $table->timestamp('retry_after')->nullable();
             $table->json('output')->nullable();
             $table->json('context')->nullable();
             $table->json('timeline')->nullable();
@@ -87,6 +90,7 @@ class TestCase extends Orchestra
             $table->text('prompt_override')->nullable();
             $table->json('supervisor_decision')->nullable();
             $table->text('supervisor_feedback')->nullable();
+            $table->timestamp('completed_at')->nullable();
             $table->timestamps();
 
             $table->foreign('pipeline_run_id')
