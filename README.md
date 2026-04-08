@@ -44,6 +44,17 @@ Only the parallel/foreach fan-out remains as a future feature; everything else i
 - Laravel `^13.0`
 - [atlas-php/atlas](https://github.com/atlasphp/atlas)
 
+### Windows developers
+
+CI only runs on Ubuntu, but the package installs and runs fine on Windows as long as your PHP build has the `sockets` extension enabled. That's needed because `atlas-php/atlas` transitively depends on `spatie/fork`, which declares `ext-sockets` as a requirement.
+
+Two easy ways to get there:
+
+- **Laravel's `php.new` installer** ([php.new](https://php.new)) — installs a Windows PHP build with `sockets` (and the rest of the common extensions) enabled out of the box. This is the recommended path.
+- **WSL2** — if you'd rather just have a Linux dev loop, install WSL2 + Ubuntu and work inside it. Everything the CI matrix tests will apply 1:1.
+
+Note: `spatie/fork` itself uses POSIX `fork()` at runtime, so any future code path that actually exercises parallel fan-out (see the F11 parallel/foreach feature) will not work on native Windows regardless of installed extensions. The rest of the package — the engine, supervisor, persistence, HTTP API, artisan commands — has no Windows-incompatible runtime dependencies.
+
 ## Installation
 
 ```bash
