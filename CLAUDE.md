@@ -19,7 +19,7 @@ composer format                # Pint
 composer prepare               # Re-runs testbench package:discover (also runs post-autoload-dump)
 ```
 
-CI matrix runs `vendor/bin/pest --ci` against PHP 8.3/8.4 × Laravel 12/13 × prefer-lowest/prefer-stable on Ubuntu and Windows. Keep changes compatible with that matrix.
+CI matrix runs `vendor/bin/pest --ci` against PHP 8.3/8.4 × Laravel 13 × prefer-lowest/prefer-stable on Ubuntu. Windows is intentionally excluded because `atlas-php/atlas` transitively pulls `spatie/fork`, which requires `ext-sockets`/`ext-pcntl` — both unavailable on `windows-latest`. Keep changes compatible with that matrix.
 
 The README references `rtk vendor/bin/pest` as the verified green command — `rtk` is a token-optimizing proxy and is optional locally.
 
